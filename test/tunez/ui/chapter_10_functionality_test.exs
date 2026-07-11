@@ -111,8 +111,8 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/artists/new")
-      |> change_field("#artist_form_name", "Temperance")
-      |> change_field("#artist_form_biography", "Electronic music")
+      |> fill_in("Name", with: "Temperance")
+      |> fill_in("Biography", with: "Electronic music")
       |> click_button("Save")
       |> assert_has(~s([part="flash_message"][data-kind="info"]),
         text: "Artist saved successfully"
@@ -124,7 +124,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/artists/#{artist.id}/edit")
-      |> change_field("#artist_form_name", "New Temperance")
+      |> fill_in("Name", with: "New Temperance")
       |> click_button("Save")
       |> assert_has(~s([part="flash_message"][data-kind="info"]),
         text: "Artist saved successfully"
@@ -137,14 +137,18 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
     test "invalid artist data is rejected without changing domain state", %{conn: conn} do
       artist = generate(artist(name: "Old Name"))
 
+      # REFERENCE error contract: the domain error IS the dispatch result —
+      # the bound control lights up (aria-invalid + message), nothing
+      # converts to flash, the domain and the location stay put.
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/artists/#{artist.id}/edit")
-      |> change_field("#artist_form_name", "")
+      |> fill_in("Name", with: "")
       |> click_button("Save")
-      |> assert_has(~s([part="flash_message"][data-kind="error"]),
-        text: "Could not save artist data"
-      )
+      |> assert_has(~s(#artist_form_name[aria-invalid="true"]))
+      |> assert_has(~s(#artist_form_name[data-blueprint-error]))
+      |> refute_has(~s([part="flash_message"][data-kind="error"]), text: "Could not save")
+      |> assert_path("/artists/#{artist.id}/edit")
 
       assert Music.get_artist_by_id!(artist.id).name == "Old Name"
     end
@@ -168,8 +172,8 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/artists/#{artist.id}/albums/new")
-      |> change_field("#album_form_name", "Sample With Tracks")
-      |> change_field("#album_form_year_released", "2021")
+      |> fill_in("Name", with: "Sample With Tracks")
+      |> fill_in("Year Released", with: "2021")
       |> click_link("Add Track")
       |> click_link("Add Track")
       |> click_link("Add Track")
@@ -196,7 +200,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/albums/#{album.id}/edit")
-      |> change_field("#album_form_name", "New Name")
+      |> fill_in("Name", with: "New Name")
       |> click_button("Save")
       |> assert_has(~s([part="flash_message"][data-kind="info"]),
         text: "Album saved successfully"
@@ -205,14 +209,18 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
 
       assert Music.get_album_by_id!(album.id).name == "New Name"
 
+      # REFERENCE error contract: the domain error IS the dispatch result —
+      # the bound control lights up, nothing converts to flash, the domain
+      # and the location stay put.
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/albums/#{album.id}/edit")
-      |> change_field("#album_form_name", "")
+      |> fill_in("Name", with: "")
       |> click_button("Save")
-      |> assert_has(~s([part="flash_message"][data-kind="error"]),
-        text: "Could not save album data"
-      )
+      |> assert_has(~s(#album_form_name[aria-invalid="true"]))
+      |> assert_has(~s(#album_form_name[data-blueprint-error]))
+      |> refute_has(~s([part="flash_message"][data-kind="error"]), text: "Could not save")
+      |> assert_path("/albums/#{album.id}/edit")
 
       assert Music.get_album_by_id!(album.id).name == "New Name"
     end

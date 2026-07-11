@@ -95,6 +95,7 @@ defmodule Tunez.UI.AlbumFormPage do
                                     :form_input,
                                     [
                                       dom_id: "album_form_name",
+                                      name: "name",
                                       value: coalesce(name, album.name),
                                       on_input: :set_name,
                                       action_input: %{name: event(:value)}
@@ -113,6 +114,7 @@ defmodule Tunez.UI.AlbumFormPage do
                                     [
                                       type: :number,
                                       dom_id: "album_form_year_released",
+                                      name: "year_released",
                                       value: coalesce(year_released, album.year_released),
                                       on_input: :set_year_released,
                                       action_input: %{year_released: event(:value)}
@@ -130,6 +132,7 @@ defmodule Tunez.UI.AlbumFormPage do
                                 :form_input,
                                 [
                                   dom_id: "album_form_cover_image_url",
+                                  name: "cover_image_url",
                                   value: coalesce(cover_image_url, album.cover_image_url),
                                   on_input: :set_cover_image_url,
                                   action_input: %{cover_image_url: event(:value)}
@@ -378,16 +381,26 @@ defmodule Tunez.UI.AlbumFormPage do
     update :save do
       require_atomic? false
 
+      # submit fields bind BY NAME; live per-field drafts back them up
+      argument :name, :string, constraints: [allow_empty?: true]
+      argument :year_released, :string, constraints: [allow_empty?: true]
+      argument :cover_image_url, :string, constraints: [allow_empty?: true]
+
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
           album = changeset.data.album
 
           cover_image_url =
-            changeset.data.cover_image_url || (album && album.cover_image_url) || ""
+            Ash.Changeset.get_argument(changeset, :cover_image_url) ||
+              changeset.data.cover_image_url || (album && album.cover_image_url) || ""
 
           input = %{
-            name: changeset.data.name || (album && album.name) || "",
-            year_released: changeset.data.year_released || (album && album.year_released),
+            name:
+              Ash.Changeset.get_argument(changeset, :name) || changeset.data.name ||
+                (album && album.name) || "",
+            year_released:
+              Ash.Changeset.get_argument(changeset, :year_released) ||
+                changeset.data.year_released || (album && album.year_released),
             cover_image_url: if(cover_image_url == "", do: nil, else: cover_image_url),
             tracks: editable_tracks(changeset)
           }
