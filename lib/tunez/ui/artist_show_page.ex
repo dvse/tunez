@@ -163,32 +163,11 @@ defmodule Tunez.UI.ArtistShowPage do
                                         " (" <> to_string(album.year_released) <> ")"
                                     ),
                                     text(" "),
-                                    if is_nil(album.duration_seconds) do
+                                    if is_nil(album.duration) do
                                       nothing()
                                     else
                                       inline(:album_duration, [], [
-                                        text(
-                                          "(" <>
-                                            at(
-                                              string_split(
-                                                to_string(
-                                                  round(
-                                                    (album.duration_seconds -
-                                                       rem(album.duration_seconds, 60)) / 60
-                                                  )
-                                                ),
-                                                "."
-                                              ),
-                                              0
-                                            ) <>
-                                            ":" <>
-                                            if(rem(album.duration_seconds, 60) < 10,
-                                              do:
-                                                "0" <>
-                                                  to_string(rem(album.duration_seconds, 60)),
-                                              else: to_string(rem(album.duration_seconds, 60))
-                                            ) <> ")"
-                                        )
+                                        text("(" <> album.duration <> ")")
                                       ])
                                     end
                                   ]),
@@ -237,28 +216,7 @@ defmodule Tunez.UI.ArtistShowPage do
                                         )
                                       ]),
                                       cell(:track_name, [], [text(track.name)]),
-                                      cell(:track_duration, [], [
-                                        text(
-                                          at(
-                                            string_split(
-                                              to_string(
-                                                round(
-                                                  (track.duration_seconds -
-                                                     rem(track.duration_seconds, 60)) / 60
-                                                )
-                                              ),
-                                              "."
-                                            ),
-                                            0
-                                          ) <>
-                                            ":" <>
-                                            if rem(track.duration_seconds, 60) < 10 do
-                                              "0" <> to_string(rem(track.duration_seconds, 60))
-                                            else
-                                              to_string(rem(track.duration_seconds, 60))
-                                            end
-                                        )
-                                      ])
+                                      cell(:track_duration, [], [text(track.duration)])
                                     ])
                                   ])
                                 ])

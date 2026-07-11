@@ -85,6 +85,10 @@ defmodule Tunez.Music.Album do
   end
 
   calculations do
+    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes do
+      public? true
+    end
+
     calculate :can_manage_album?,
               :boolean,
               expr(
