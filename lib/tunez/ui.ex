@@ -9,6 +9,7 @@ defmodule Tunez.UI do
     resource Tunez.UI.ArtistFormPage
     resource Tunez.UI.ArtistIndexPage
     resource Tunez.UI.ArtistShowPage
+    resource Tunez.UI.ConfirmPage
 
     resource Tunez.UI.FlashStack do
       define :put_flash,
@@ -18,6 +19,10 @@ defmodule Tunez.UI do
     end
 
     resource Tunez.UI.NotificationsPage
+    resource Tunez.UI.MagicSignInPage
+    resource Tunez.UI.RegisterPage
+    resource Tunez.UI.ResetPage
+    resource Tunez.UI.SignInPage
     resource Tunez.UI.AppShell
     resource Tunez.UI.PageHeader
   end

@@ -2,10 +2,10 @@ defmodule Tunez.Music.ArtistFollower do
   use Ash.Resource,
     otp_app: :tunez,
     domain: Tunez.Music,
+    notifiers: [AshBlueprint.Notifier],
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshGraphql.Resource],
-    notifiers: [AshBlueprint.Notifier]
+    extensions: [AshGraphql.Resource]
 
   graphql do
     type :artist_follower
@@ -18,6 +18,32 @@ defmodule Tunez.Music.ArtistFollower do
     references do
       reference :artist, on_delete: :delete, index?: true
       reference :follower, on_delete: :delete
+    end
+  end
+
+  actions do
+    defaults [:read]
+
+    read :for_artist do
+      argument :artist_id, :uuid do
+        allow_nil? false
+      end
+
+      filter expr(artist_id == ^arg(:artist_id))
+      pagination keyset?: true, required?: false
+    end
+
+    create :create do
+      accept [:artist_id]
+      change relate_actor(:follower, allow_nil?: false)
+    end
+
+    destroy :destroy do
+      argument :artist_id, :uuid do
+        allow_nil? false
+      end
+
+      change filter expr(artist_id == ^arg(:artist_id) && follower_id == ^actor(:id))
     end
   end
 
@@ -44,34 +70,6 @@ defmodule Tunez.Music.ArtistFollower do
     belongs_to :follower, Tunez.Accounts.User do
       primary_key? true
       allow_nil? false
-    end
-  end
-
-  actions do
-    defaults [:read]
-
-    read :for_artist do
-      argument :artist_id, :uuid do
-        allow_nil? false
-      end
-
-      filter expr(artist_id == ^arg(:artist_id))
-      pagination keyset?: true, required?: false
-    end
-
-    create :create do
-      accept [:artist_id]
-      change relate_actor(:follower, allow_nil?: false)
-    end
-
-    destroy :destroy do
-      require_atomic? false
-
-      argument :artist_id, :uuid do
-        allow_nil? false
-      end
-
-      change filter expr(artist_id == ^arg(:artist_id) && follower_id == ^actor(:id))
     end
   end
 end

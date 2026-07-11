@@ -296,10 +296,16 @@ defmodule Tunez.UI.ArtistIndexPage do
          {limit, offset} =
            if mode == :next, do: {1, page.offset + page.limit}, else: {page.limit, page.offset}
 
-         artists =
-           Tunez.Music.browse_artists!(
-             %{query: page.q, sort_by: page.sort_by, limit: limit, offset: offset},
-             scope_opts
+         # the UPSTREAM contract, untouched: paginated :search plus
+         # sort_input — paging/sorting are read options, not domain code
+         %{results: artists} =
+           Tunez.Music.search_artists!(
+             page.q,
+             scope_opts ++
+               [
+                 page: [limit: limit, offset: offset],
+                 query: [sort_input: to_string(page.sort_by)]
+               ]
            )
 
          if mode == :next, do: List.first(artists), else: artists

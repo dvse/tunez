@@ -11,9 +11,27 @@ defmodule TunezWeb.AuthController do
 
     message =
       case activity do
-        {:confirm_new_user, :confirm} -> "Your email address has now been confirmed"
-        {:password, :reset} -> "Your password has successfully been reset"
-        _ -> "You are now signed in"
+        {:confirm_new_user, :confirm} ->
+          "Your email address has now been confirmed"
+
+        {:password, :reset} ->
+          "Your password has successfully been reset"
+
+        {:password, :reset_request} ->
+          "If this user exists in our system, you will receive password reset instructions shortly"
+
+        {:magic_link, :request} ->
+          "Check your email for a sign-in link"
+
+        _ ->
+          "You are now signed in"
+      end
+
+    return_to =
+      case activity do
+        {:password, :reset_request} -> "/reset"
+        {:magic_link, :request} -> "/sign-in"
+        _ -> return_to
       end
 
     conn

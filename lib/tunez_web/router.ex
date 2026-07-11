@@ -24,6 +24,7 @@ defmodule TunezWeb.Router do
   pipeline :datastar do
     plug :fetch_session
     plug AshBlueprint.Phoenix.EnsureSessionId
+    plug :protect_datastar_forms
     plug :load_from_session
   end
 
@@ -49,9 +50,10 @@ defmodule TunezWeb.Router do
 
     live_session :ash_blueprint,
       on_mount: [
+        {__MODULE__, :blueprint_context},
         {AshBlueprint.Phoenix.LiveSession, :live_user_optional}
       ],
-      session: {AshBlueprint.Phoenix.LiveSession, :generate_session, [:tunez]} do
+      session: {__MODULE__, :blueprint_session, []} do
       ash_blueprint_routes(domains: [Tunez.UI])
     end
   end
@@ -82,34 +84,6 @@ defmodule TunezWeb.Router do
 
     auth_routes AuthController, Tunez.Accounts.User, path: "/auth"
     sign_out_route AuthController
-
-    # Remove these if you'd like to use your own authentication views
-    sign_in_route register_path: "/register",
-                  reset_path: "/reset",
-                  auth_routes_prefix: "/auth",
-                  on_mount: [{TunezWeb.LiveUserAuth, :live_no_user}],
-                  overrides: [
-                    TunezWeb.AuthOverrides,
-                    Elixir.AshAuthentication.Phoenix.Overrides.Default
-                  ]
-
-    # Remove this if you do not want to use the reset password feature
-    reset_route auth_routes_prefix: "/auth",
-                overrides: [
-                  TunezWeb.AuthOverrides,
-                  Elixir.AshAuthentication.Phoenix.Overrides.Default
-                ]
-
-    # Remove this if you do not use the confirmation strategy
-    confirm_route Tunez.Accounts.User, :confirm_new_user,
-      auth_routes_prefix: "/auth",
-      overrides: [TunezWeb.AuthOverrides, Elixir.AshAuthentication.Phoenix.Overrides.Default]
-
-    # Remove this if you do not use the magic link strategy.
-    magic_sign_in_route(Tunez.Accounts.User, :magic_link,
-      auth_routes_prefix: "/auth",
-      overrides: [TunezWeb.AuthOverrides, Elixir.AshAuthentication.Phoenix.Overrides.Default]
-    )
   end
 
   # Other scopes may use custom stacks.
@@ -137,9 +111,32 @@ defmodule TunezWeb.Router do
   def datastar_session_id(conn),
     do: Plug.Conn.get_session(conn, "ash_blueprint_session_id")
 
+  # Seed a protected form token on document GETs without changing Datastar's dispatch protocol.
+  def protect_datastar_forms(%Plug.Conn{method: "GET"} = conn, _opts) do
+    Plug.CSRFProtection.call(conn, Plug.CSRFProtection.init([]))
+  end
+
+  def protect_datastar_forms(conn, _opts), do: conn
+
+  def blueprint_session(conn) do
+    conn
+    |> AshBlueprint.Phoenix.LiveSession.generate_session(:tunez)
+    |> Map.put("csrf_token", Plug.CSRFProtection.get_csrf_token())
+  end
+
+  def on_mount(:blueprint_context, _params, session, socket) do
+    context = %{csrf_token: Map.fetch!(session, "csrf_token")}
+    {:cont, Phoenix.Component.assign(socket, :ash_blueprint_context, context)}
+  end
+
   def datastar_actor(conn), do: conn.assigns[:current_user]
 
   def datastar_tenant(conn), do: Ash.PlugHelpers.get_tenant(conn)
 
-  def datastar_context(conn), do: Ash.PlugHelpers.get_context(conn) || %{}
+  def datastar_context(conn) do
+    conn
+    |> Ash.PlugHelpers.get_context()
+    |> Kernel.||(%{})
+    |> Map.put(:csrf_token, Plug.CSRFProtection.get_csrf_token())
+  end
 end

@@ -11,44 +11,6 @@ defmodule Tunez.Accounts.Token do
     repo Tunez.Repo
   end
 
-  policies do
-    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
-      description "AshAuthentication can interact with the token resource"
-      authorize_if always()
-    end
-  end
-
-  attributes do
-    attribute :jti, :string do
-      primary_key? true
-      public? true
-      allow_nil? false
-      sensitive? true
-    end
-
-    attribute :subject, :string do
-      allow_nil? false
-      public? true
-    end
-
-    attribute :expires_at, :utc_datetime do
-      allow_nil? false
-      public? true
-    end
-
-    attribute :purpose, :string do
-      allow_nil? false
-      public? true
-    end
-
-    attribute :extra_data, :map do
-      public? true
-    end
-
-    create_timestamp :created_at
-    update_timestamp :updated_at
-  end
-
   actions do
     defaults [:read]
 
@@ -110,5 +72,43 @@ defmodule Tunez.Accounts.Token do
       argument :subject, :string, allow_nil?: false, sensitive?: true
       change AshAuthentication.TokenResource.RevokeAllStoredForSubjectChange
     end
+  end
+
+  policies do
+    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
+      description "AshAuthentication can interact with the token resource"
+      authorize_if always()
+    end
+  end
+
+  attributes do
+    attribute :jti, :string do
+      primary_key? true
+      public? true
+      allow_nil? false
+      sensitive? true
+    end
+
+    attribute :subject, :string do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :expires_at, :utc_datetime do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :purpose, :string do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :extra_data, :map do
+      public? true
+    end
+
+    create_timestamp :created_at
+    update_timestamp :updated_at
   end
 end

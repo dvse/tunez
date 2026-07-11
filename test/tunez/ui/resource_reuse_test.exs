@@ -1,12 +1,22 @@
 defmodule Tunez.UI.ResourceReuseTest do
   use ExUnit.Case, async: true
 
-  @pages [
+  @catalogue_pages [
     Tunez.UI.AlbumFormPage,
     Tunez.UI.ArtistFormPage,
     Tunez.UI.ArtistIndexPage,
     Tunez.UI.ArtistShowPage
   ]
+
+  @auth_pages [
+    Tunez.UI.ConfirmPage,
+    Tunez.UI.MagicSignInPage,
+    Tunez.UI.RegisterPage,
+    Tunez.UI.ResetPage,
+    Tunez.UI.SignInPage
+  ]
+
+  @pages @catalogue_pages ++ @auth_pages
 
   @resource_parents @pages ++
                       [
@@ -38,10 +48,13 @@ defmodule Tunez.UI.ResourceReuseTest do
              MapSet.new([
                Tunez.UI.AlbumFormPage,
                Tunez.UI.ArtistFormPage,
-               Tunez.UI.ArtistIndexPage
+               Tunez.UI.ArtistIndexPage,
+               Tunez.UI.RegisterPage,
+               Tunez.UI.ResetPage,
+               Tunez.UI.SignInPage
              ])
 
-    assert Map.fetch!(parents_by_child, Tunez.UI.PageHeader) == MapSet.new(@pages)
+    assert Map.fetch!(parents_by_child, Tunez.UI.PageHeader) == MapSet.new(@catalogue_pages)
 
     assert Map.fetch!(parents_by_child, Tunez.UI.CoverImage) ==
              MapSet.new([
@@ -95,6 +108,24 @@ defmodule Tunez.UI.ResourceReuseTest do
           ]
       )
 
+    upstream_authentication_root =
+      Path.join(
+        upstream,
+        "deps/ash_authentication_phoenix/lib/ash_authentication_phoenix"
+      )
+
+    upstream_authentication_files =
+      Enum.map(
+        ~w(sign_in_live reset_live confirm_live magic_sign_in_live),
+        &Path.join(upstream_authentication_root, "#{&1}.ex")
+      ) ++
+        Enum.flat_map(~w(password reset confirm magic_link), fn component ->
+          [Path.join(upstream_authentication_root, "components/#{component}.ex")] ++
+            Path.wildcard(Path.join(upstream_authentication_root, "components/#{component}/*.ex"))
+        end)
+
+    upstream_authentication_lines = line_count.(upstream_authentication_files)
+
     router_lines =
       upstream
       |> Path.join("lib/tunez_web/router.ex")
@@ -110,13 +141,15 @@ defmodule Tunez.UI.ResourceReuseTest do
 
     # Blueprint resources own the route/session/relation graph that LiveView
     # leaves in its host router. Count only that upstream UI host surface, not
-    # the unrelated API, GraphQL, authentication-screen, or dev routes.
+    # the unrelated API, GraphQL, or dev routes. Authentication is now
+    # Blueprint-owned, so include the upstream authentication UI it replaces.
     upstream_router_ui_lines =
       Enum.find_index(router_lines, &String.contains?(&1, "pipeline :graphql do")) +
         lines_between.("pipeline :browser do", "pipeline :api do") +
         lines_between.("scope \"/\", TunezWeb do", "scope \"/gql\" do")
 
-    upstream_lines = upstream_live_view_lines + upstream_router_ui_lines
+    upstream_lines =
+      upstream_live_view_lines + upstream_authentication_lines + upstream_router_ui_lines
 
     assert blueprint_lines * 5 <= upstream_lines * 6,
            "Ash UI is #{blueprint_lines} LoC; 1.2x chapter-10 is #{div(upstream_lines * 6, 5)}"

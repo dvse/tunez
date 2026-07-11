@@ -69,6 +69,12 @@
 [part="artist_grid"] { @apply gap-6 lg:gap-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4; }
 [part="artist_name"] { @apply text-lg font-semibold; }
 [part="auth_link"] { @apply phx-submit-loading:opacity-75 rounded-lg font-medium leading-none inline-block py-2 px-2 text-xs bg-gray-100; }
+[part="auth_alternate"] { @apply mt-10 border-t border-zinc-200 pt-6 max-w-md; }
+[part="auth_alternate_text"] { @apply mb-3 text-sm text-zinc-600; }
+[part="auth_form"] { @apply max-w-md; }
+[part="auth_intro"] { @apply mb-6 max-w-md text-zinc-600; }
+[part="auth_secondary_link"] { @apply text-sm font-medium text-primary-700 underline; }
+[part="auth_switch"] { @apply mt-6 text-sm text-zinc-600; }
 [part="avatar"] { @apply rounded-full size-8; }
 [part="avatar_toggle"] { @apply pr-0; }
 [part="biography"] { @apply mb-6; }

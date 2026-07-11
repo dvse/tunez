@@ -330,9 +330,10 @@ defmodule Tunez.UI.AlbumFormPage do
             year_released: data.year_released || (data.album && data.album.year_released),
             cover_image_url: if(cover_image_url == "", do: nil, else: cover_image_url),
             tracks:
-              Enum.map(data.tracks, fn track ->
+              Enum.with_index(data.tracks, fn track, order ->
                 %{
-                  track_id: track.track_id,
+                  id: track.track_id,
+                  order: order,
                   name: track.name,
                   duration: track.duration
                 }
