@@ -14,6 +14,7 @@ defmodule TunezWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug AshBlueprint.Phoenix.EnsureSessionId
     plug :fetch_live_flash
     plug :put_root_layout, html: {AshBlueprint.Phoenix.RootLayout, :render}
     plug :protect_from_forgery

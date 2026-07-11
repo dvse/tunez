@@ -81,6 +81,7 @@ defmodule Tunez.UI.ArtistFormPage do
                                 :form_input,
                                 [
                                   dom_id: "artist_form_name",
+                                  name: "name",
                                   value: coalesce(name, artist.name),
                                   on_input: :set_name,
                                   action_input: %{name: event(:value)}
@@ -96,6 +97,7 @@ defmodule Tunez.UI.ArtistFormPage do
                                 :form_textarea,
                                 [
                                   dom_id: "artist_form_biography",
+                                  name: "biography",
                                   on_input: :set_biography,
                                   action_input: %{biography: event(:value)}
                                 ],
@@ -142,13 +144,18 @@ defmodule Tunez.UI.ArtistFormPage do
     update :save do
       require_atomic? false
 
+      # submit fields bind BY NAME; live per-field drafts back them up
+      argument :name, :string, constraints: [allow_empty?: true]
+      argument :biography, :string, constraints: [allow_empty?: true]
+
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
           input = %{
             name:
-              changeset.data.name || (changeset.data.artist && changeset.data.artist.name) || "",
+              Ash.Changeset.get_argument(changeset, :name) || changeset.data.name ||
+                (changeset.data.artist && changeset.data.artist.name) || "",
             biography:
-              changeset.data.biography ||
+              Ash.Changeset.get_argument(changeset, :biography) || changeset.data.biography ||
                 (changeset.data.artist && changeset.data.artist.biography) || ""
           }
 
