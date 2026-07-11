@@ -190,35 +190,21 @@ defmodule Tunez.UI.ArtistIndexPage do
                     ]),
                     if not is_nil(next_artist) or offset > 0 do
                       box(:pagination, [], [
-                        link(
+                        button(
                           :primary_link_inverse,
                           [
-                            to:
-                              "/?sort_by=" <>
-                                to_string(sort_by) <>
-                                "&q=" <>
-                                q <>
-                                "&limit=" <>
-                                to_string(limit) <>
-                                "&offset=" <>
-                                to_string(if(offset > limit, do: offset - limit, else: 0)),
+                            type: :button,
+                            on_click: :previous_page,
                             data: [role: "previous-page"],
                             disabled: offset == 0
                           ],
                           [text("« Previous")]
                         ),
-                        link(
+                        button(
                           :primary_link_inverse,
                           [
-                            to:
-                              "/?sort_by=" <>
-                                to_string(sort_by) <>
-                                "&q=" <>
-                                q <>
-                                "&limit=" <>
-                                to_string(limit) <>
-                                "&offset=" <>
-                                to_string(offset + limit),
+                            type: :button,
+                            on_click: :next_page,
                             data: [role: "next-page"],
                             disabled: is_nil(next_artist)
                           ],
@@ -258,6 +244,29 @@ defmodule Tunez.UI.ArtistIndexPage do
     update :set_query do
       argument :query, :string, allow_nil?: false, constraints: [allow_empty?: true]
       change set_attribute(:q, arg(:query))
+    end
+
+    update :previous_page do
+      change fn changeset, _context ->
+        offset = changeset.data.offset
+        limit = changeset.data.limit
+
+        Ash.Changeset.change_attribute(
+          changeset,
+          :offset,
+          if(offset > limit, do: offset - limit, else: 0)
+        )
+      end
+    end
+
+    update :next_page do
+      change fn changeset, _context ->
+        Ash.Changeset.change_attribute(
+          changeset,
+          :offset,
+          changeset.data.offset + changeset.data.limit
+        )
+      end
     end
 
     update :change_sort do

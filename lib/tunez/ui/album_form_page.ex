@@ -10,7 +10,14 @@ defmodule Tunez.UI.AlbumFormPage do
     private? false
   end
 
-  route("/artists/:artist_id/albums/new", [])
+  route("/artists/:artist_id/albums/new",
+    location:
+      expr(
+        if not is_nil(saved_artist_id) do
+          "/artists/" <> saved_artist_id
+        end
+      )
+  )
 
   policies do
     policy always() do
@@ -23,6 +30,7 @@ defmodule Tunez.UI.AlbumFormPage do
     uuid_primary_key :id
     attribute :session_id, :uuid, allow_nil?: false, public?: false
     attribute :artist_id, :uuid, public?: true
+    attribute :saved_artist_id, :string, public?: true
     attribute :album_id, :uuid, public?: true
     attribute :name, :string, constraints: [allow_empty?: true]
     attribute :year_released, :integer
@@ -259,6 +267,8 @@ defmodule Tunez.UI.AlbumFormPage do
       change AshBlueprint.Changes.SetSessionId
       change set_attribute(:artist_id, arg(:artist_id))
       change set_attribute(:album_id, arg(:album_id))
+      # handoff state is mount-reset: re-entry always gives a fresh form
+      change set_attribute(:saved_artist_id, nil)
       change set_attribute(:track_drafts, nil)
       change load([:artist, :album])
     end
@@ -392,16 +402,26 @@ defmodule Tunez.UI.AlbumFormPage do
               Tunez.Music.update_album(changeset.data.album, input, scope: context)
             end
 
-          {level, message} =
-            case result do
-              {:ok, _album} -> {:info, "Album saved successfully"}
-              {:error, _error} -> {:error, "Could not save album data"}
-            end
+          case result do
+            {:ok, album} ->
+              {:ok, _flash} =
+                Tunez.UI.put_flash(
+                  changeset.data.session_id,
+                  :info,
+                  "Album saved successfully",
+                  scope: context
+                )
 
-          {:ok, _flash} =
-            Tunez.UI.put_flash(changeset.data.session_id, level, message, scope: context)
+              Ash.Changeset.force_change_attribute(
+                changeset,
+                :saved_artist_id,
+                album.artist_id
+              )
 
-          changeset
+            {:error, error} ->
+              # the domain error IS the dispatch result
+              Ash.Changeset.add_error(changeset, error)
+          end
         end)
       end
     end

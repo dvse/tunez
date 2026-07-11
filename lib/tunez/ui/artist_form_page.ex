@@ -10,7 +10,14 @@ defmodule Tunez.UI.ArtistFormPage do
     private? false
   end
 
-  route("/artists/new", [])
+  route("/artists/new",
+    location:
+      expr(
+        if not is_nil(saved_artist_id) do
+          "/artists/" <> saved_artist_id
+        end
+      )
+  )
 
   policies do
     bypass actor_attribute_equals(:role, :admin) do
@@ -33,6 +40,7 @@ defmodule Tunez.UI.ArtistFormPage do
     attribute :artist_id, :uuid, public?: true
     attribute :name, :string, constraints: [allow_empty?: true]
     attribute :biography, :string, constraints: [allow_empty?: true]
+    attribute :saved_artist_id, :string, public?: true
   end
 
   relationships do
@@ -118,6 +126,8 @@ defmodule Tunez.UI.ArtistFormPage do
       argument :artist_id, :uuid
       change AshBlueprint.Changes.SetSessionId
       change set_attribute(:artist_id, arg(:artist_id))
+      # handoff state is mount-reset: re-entry always gives a fresh form
+      change set_attribute(:saved_artist_id, nil)
       change load(:artist)
     end
 
@@ -149,16 +159,23 @@ defmodule Tunez.UI.ArtistFormPage do
               Tunez.Music.update_artist(changeset.data.artist, input, scope: context)
             end
 
-          {level, message} =
-            case result do
-              {:ok, _artist} -> {:info, "Artist saved successfully"}
-              {:error, _error} -> {:error, "Could not save artist data"}
-            end
+          case result do
+            {:ok, artist} ->
+              {:ok, _flash} =
+                Tunez.UI.put_flash(
+                  changeset.data.session_id,
+                  :info,
+                  "Artist saved successfully",
+                  scope: context
+                )
 
-          {:ok, _flash} =
-            Tunez.UI.put_flash(changeset.data.session_id, level, message, scope: context)
+              Ash.Changeset.force_change_attribute(changeset, :saved_artist_id, artist.id)
 
-          changeset
+            {:error, error} ->
+              # the domain error IS the dispatch result — field-path'd
+              # errors reach the bound controls, nothing converts to flash
+              Ash.Changeset.add_error(changeset, error)
+          end
         end)
       end
     end

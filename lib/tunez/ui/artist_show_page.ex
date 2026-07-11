@@ -10,7 +10,14 @@ defmodule Tunez.UI.ArtistShowPage do
     private? false
   end
 
-  route("/artists/:artist_id", [])
+  route("/artists/:artist_id",
+    location:
+      expr(
+        if deleted? do
+          "/"
+        end
+      )
+  )
 
   resource do
     description "Artist details, releases, tracks, following, and catalogue management."
@@ -37,6 +44,7 @@ defmodule Tunez.UI.ArtistShowPage do
   attributes do
     uuid_primary_key :id
     attribute :session_id, :uuid, allow_nil?: false, public?: false
+    attribute :deleted?, :boolean, allow_nil?: false, default: false, public?: true
     attribute :artist_id, :uuid, allow_nil?: false, public?: true
   end
 
@@ -213,6 +221,8 @@ defmodule Tunez.UI.ArtistShowPage do
       argument :artist_id, :uuid, allow_nil?: false
       change AshBlueprint.Changes.SetSessionId
       change set_attribute(:artist_id, arg(:artist_id))
+      # handoff state is mount-reset
+      change set_attribute(:deleted?, false)
     end
 
     update :follow do
@@ -291,8 +301,10 @@ defmodule Tunez.UI.ArtistShowPage do
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
+          result = Tunez.Music.destroy_artist(changeset.data.artist, scope: context)
+
           {level, message} =
-            case Tunez.Music.destroy_artist(changeset.data.artist, scope: context) do
+            case result do
               :ok -> {:info, "Artist deleted successfully"}
               {:error, _error} -> {:error, "Could not delete artist"}
             end
@@ -300,7 +312,10 @@ defmodule Tunez.UI.ArtistShowPage do
           {:ok, _flash} =
             Tunez.UI.put_flash(changeset.data.session_id, level, message, scope: context)
 
-          changeset
+          case result do
+            :ok -> Ash.Changeset.force_change_attribute(changeset, :deleted?, true)
+            {:error, _error} -> changeset
+          end
         end)
       end
     end
