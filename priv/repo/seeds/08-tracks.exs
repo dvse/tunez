@@ -16,7 +16,7 @@ album_name_map = Enum.map(albums, &{&1.name, &1.id}) |> Map.new()
 # Delete the existing records for tracks from the seed data albums
 Tunez.Music.Track
 |> Ash.Query.filter(album_id in ^album_ids)
-|> Ash.bulk_destroy!(:destroy, %{}, authorize?: false)
+|> Ash.bulk_destroy!(:destroy, %{}, strategy: :stream, authorize?: false)
 
 # And re-insert fresh copies of them
 Tunez.Seeder.albums()

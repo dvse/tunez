@@ -4,7 +4,7 @@ defmodule Tunez.Accounts.Notification do
     domain: Tunez.Accounts,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    notifiers: [Ash.Notifier.PubSub]
+    notifiers: [AshBlueprint.Notifier]
 
   postgres do
     table "notifications"
@@ -17,7 +17,12 @@ defmodule Tunez.Accounts.Notification do
   end
 
   actions do
-    defaults [:read, :destroy]
+    defaults [:read]
+
+    destroy :destroy do
+      primary? true
+      require_atomic? false
+    end
 
     create :create do
       accept [:user_id, :album_id]
@@ -46,18 +51,6 @@ defmodule Tunez.Accounts.Notification do
       authorize_if expr(album.can_manage_album?)
       authorize_if relates_to_actor_via(:user)
     end
-  end
-
-  pub_sub do
-    prefix "notifications"
-    module TunezWeb.Endpoint
-
-    transform fn notification ->
-      Map.take(notification.data, [:id, :user_id, :album_id])
-    end
-
-    publish :create, [:user_id]
-    publish :destroy, [:user_id]
   end
 
   attributes do

@@ -1,5 +1,12 @@
 defmodule Tunez.Accounts do
-  use Ash.Domain, otp_app: :tunez, extensions: [AshGraphql.Domain, AshJsonApi.Domain]
+  use Ash.Domain, otp_app: :tunez, extensions: [AshAi, AshGraphql.Domain, AshJsonApi.Domain]
+
+  tools do
+    tool :list_my_notifications, Tunez.Accounts.Notification, :for_user do
+      description "List the current actor's album notifications, newest first. Requires an authenticated actor, accepts no inputs, does not mutate data, and returns public notification fields with album details."
+      load album: [:artist]
+    end
+  end
 
   graphql do
     queries do
@@ -46,6 +53,7 @@ defmodule Tunez.Accounts do
 
     resource Tunez.Accounts.Notification do
       define :notifications_for_user, action: :for_user
+      define :get_notification_by_id, action: :for_user, get_by: :id
       define :dismiss_notification, action: :destroy
     end
   end

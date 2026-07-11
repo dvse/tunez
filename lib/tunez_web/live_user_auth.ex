@@ -31,7 +31,7 @@ defmodule TunezWeb.LiveUserAuth do
 
   def on_mount(:live_no_user, _params, _session, socket) do
     if socket.assigns[:current_user] do
-      {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
+      {:halt, Phoenix.LiveView.redirect(socket, to: "/")}
     else
       {:cont, assign(socket, :current_user, nil)}
     end
@@ -46,7 +46,7 @@ defmodule TunezWeb.LiveUserAuth do
       socket =
         socket
         |> Phoenix.LiveView.put_flash(:error, "Unauthorized!")
-        |> Phoenix.LiveView.redirect(to: ~p"/")
+        |> Phoenix.LiveView.redirect(to: "/")
 
       {:halt, socket}
     end

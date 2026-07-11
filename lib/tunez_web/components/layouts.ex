@@ -17,7 +17,7 @@ defmodule TunezWeb.Layouts do
     <div class="w-full max-w-6xl m-auto">
       <div class="flex items-center w-full p-4 pb-2 border-b-2 border-primary-600">
         <div class="flex-1 mr-4">
-          <.link navigate={~p"/"}>
+          <.link navigate="/">
             <.icon
               name="hero-musical-note-solid"
               class="w-8 h-8 bg-accent-400 inline-block align-middle"

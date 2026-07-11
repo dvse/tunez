@@ -54,7 +54,8 @@ defmodule Tunez.Generator do
           name: sequence(:album_name, &"Album #{&1}"),
           year_released: StreamData.integer(1951..2024),
           artist_id: artist_id,
-          cover_image_url: nil
+          cover_image_url: nil,
+          tracks: nil
         ],
         overrides: opts,
         actor: actor,

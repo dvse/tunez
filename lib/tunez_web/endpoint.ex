@@ -28,6 +28,8 @@ defmodule TunezWeb.Endpoint do
     gzip: false,
     only: TunezWeb.static_paths()
 
+  plug AshBlueprint.Phoenix.Assets
+
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do

@@ -44,6 +44,9 @@ defmodule Tunez.MixProject do
       {:open_api_spex, "~> 3.0"},
       {:ash_json_api, "~> 1.0"},
       {:ash_phoenix, "~> 2.0"},
+      {:ash_ai, "~> 0.7.2"},
+      {:ash_blueprint, path: "../ash_blueprint", override: true},
+      {:ash_blueprint_phoenix, path: "../ash_blueprint/packages/ash_blueprint_phoenix"},
       {:ash_postgres, "~> 2.0"},
       {:sourceror, "~> 1.8", only: [:dev, :test]},
       {:ash, "~> 3.0"},
@@ -74,6 +77,7 @@ defmodule Tunez.MixProject do
       {:bandit, "~> 1.5"},
       {:igniter, "~> 0.3", only: [:dev]},
       {:lazy_html, ">= 0.0.0", only: :test},
+      {:floki, "~> 0.38", only: :test},
       {:phoenix_test, "~> 0.9", only: :test, runtime: false}
     ]
   end

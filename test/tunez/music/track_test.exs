@@ -22,7 +22,7 @@ defmodule Tunez.Music.TrackTest do
       updated_album =
         Music.update_album!(
           album,
-          %{tracks: [%{order: 1, name: "new!!", duration: "2:22", duration_seconds: "142"}]},
+          %{tracks: [%{name: "new!!", duration: "2:22"}]},
           actor: admin
         )
 

@@ -250,9 +250,11 @@ defmodule TunezWeb.CoreComponents do
     <.form :let={f} for={@for} as={@as} {@rest}>
       <div class="space-y-8">
         {render_slot(@inner_block, f)}
-        <div :for={action <- @actions} class="mt-2 flex items-center justify-between gap-6">
-          {render_slot(action, f)}
-        </div>
+        <%= for action <- @actions do %>
+          <div class="mt-2 flex items-center justify-between gap-6">
+            {render_slot(action, f)}
+          </div>
+        <% end %>
       </div>
     </.form>
     """
@@ -376,7 +378,9 @@ defmodule TunezWeb.CoreComponents do
         />
         {@label}
       </label>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <%= for msg <- @errors do %>
+        <.error>{msg}</.error>
+      <% end %>
     </.form_control>
     """
   end
@@ -386,10 +390,14 @@ defmodule TunezWeb.CoreComponents do
     <.form_control class={@container_class} errors={@errors}>
       <.label for={@id}>{@label}</.label>
       <select id={@id} name={@name} class={[form_input_styles(), @class]} multiple={@multiple} {@rest}>
-        <option :if={@prompt} value="">{@prompt}</option>
+        <%= if @prompt do %>
+          <option value="">{@prompt}</option>
+        <% end %>
         {Phoenix.HTML.Form.options_for_select(@options, @value)}
       </select>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <%= for msg <- @errors do %>
+        <.error>{msg}</.error>
+      <% end %>
     </.form_control>
     """
   end
@@ -399,7 +407,9 @@ defmodule TunezWeb.CoreComponents do
     <.form_control class={@container_class} errors={@errors}>
       <.label for={@id}>{@label}</.label>
       <textarea id={@id} name={@name} class={[form_input_styles(), @class, "min-h-[6rem]"]} {@rest}><%= Phoenix.HTML.Form.normalize_value("textarea", @value) %></textarea>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <%= for msg <- @errors do %>
+        <.error>{msg}</.error>
+      <% end %>
     </.form_control>
     """
   end
@@ -418,7 +428,9 @@ defmodule TunezWeb.CoreComponents do
         phx-debounce="250"
         {@rest}
       />
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <%= for msg <- @errors do %>
+        <.error>{msg}</.error>
+      <% end %>
     </.form_control>
     """
   end

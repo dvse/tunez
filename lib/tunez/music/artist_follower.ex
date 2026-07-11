@@ -4,7 +4,8 @@ defmodule Tunez.Music.ArtistFollower do
     domain: Tunez.Music,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshGraphql.Resource]
+    extensions: [AshGraphql.Resource],
+    notifiers: [AshBlueprint.Notifier]
 
   graphql do
     type :artist_follower
@@ -38,6 +39,8 @@ defmodule Tunez.Music.ArtistFollower do
     end
 
     destroy :destroy do
+      require_atomic? false
+
       argument :artist_id, :uuid do
         allow_nil? false
       end

@@ -4,7 +4,8 @@ defmodule Tunez.Music.Album do
     domain: Tunez.Music,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshGraphql.Resource, AshJsonApi.Resource],
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Ash.Policy.Authorizer],
+    notifiers: [AshBlueprint.Notifier]
 
   graphql do
     type :album
@@ -29,19 +30,32 @@ defmodule Tunez.Music.Album do
 
     create :create do
       accept [:name, :year_released, :cover_image_url, :artist_id]
-      argument :tracks, {:array, :map}
-      change manage_relationship(:tracks, type: :direct_control, order_is_key: :order)
+
+      argument :tracks, {:array, Tunez.Music.TrackInput} do
+        allow_nil? true
+      end
+
+      change fn changeset, _context ->
+        manage_track_inputs(changeset)
+      end
     end
 
     update :update do
       accept [:name, :year_released, :cover_image_url]
       require_atomic? false
-      argument :tracks, {:array, :map}
-      change manage_relationship(:tracks, type: :direct_control, order_is_key: :order)
+
+      argument :tracks, {:array, Tunez.Music.TrackInput} do
+        allow_nil? true
+      end
+
+      change fn changeset, _context ->
+        manage_track_inputs(changeset)
+      end
     end
 
     destroy :destroy do
       primary? true
+      require_atomic? false
 
       change cascade_destroy(:notifications, return_notifications?: true, after_action?: false)
     end
@@ -75,7 +89,7 @@ defmodule Tunez.Music.Album do
   validations do
     validate numericality(:year_released,
                greater_than: 1950,
-               less_than_or_equal_to: &__MODULE__.next_year/0
+               less_than_or_equal_to: Date.utc_today().year + 1
              ),
              where: [present(:year_released)],
              message: "must be between 1950 and next year"
@@ -84,8 +98,6 @@ defmodule Tunez.Music.Album do
       where: [changing(:cover_image_url)],
       message: "must start with https:// or /images/"
   end
-
-  def next_year, do: Date.utc_today().year + 1
 
   attributes do
     uuid_primary_key :id
@@ -142,5 +154,30 @@ defmodule Tunez.Music.Album do
   identities do
     identity :unique_album_names_per_artist, [:name, :artist_id],
       message: "already exists for this artist"
+  end
+
+  defp manage_track_inputs(changeset) do
+    case Ash.Changeset.get_argument(changeset, :tracks) do
+      nil ->
+        changeset
+
+      tracks ->
+        tracks =
+          tracks
+          |> Enum.with_index()
+          |> Enum.map(fn {track, order} ->
+            %{
+              id: track.track_id,
+              order: order,
+              name: track.name,
+              duration: track.duration
+            }
+          end)
+
+        Ash.Changeset.manage_relationship(changeset, :tracks, tracks,
+          type: :direct_control,
+          order_is_key: :order
+        )
+    end
   end
 end

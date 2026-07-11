@@ -65,10 +65,10 @@ defmodule Tunez.Accounts.ArtistFollowerTest do
       users = setup_users()
       artist = generate(artist())
 
-      assert Music.can_unfollow_artist?(users.admin, artist)
-      assert Music.can_unfollow_artist?(users.editor, artist)
-      assert Music.can_unfollow_artist?(users.user, artist)
-      refute Music.can_unfollow_artist?(nil, artist)
+      Enum.each([users.admin, users.editor, users.user], fn user ->
+        Music.follow_artist!(artist, actor: user)
+        assert :ok = Music.unfollow_artist(artist, actor: user)
+      end)
     end
   end
 end

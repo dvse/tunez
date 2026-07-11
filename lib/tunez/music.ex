@@ -1,5 +1,13 @@
 defmodule Tunez.Music do
-  use Ash.Domain, otp_app: :tunez, extensions: [AshGraphql.Domain, AshJsonApi.Domain, AshPhoenix]
+  use Ash.Domain,
+    otp_app: :tunez,
+    extensions: [AshAi, AshGraphql.Domain, AshJsonApi.Domain, AshPhoenix]
+
+  tools do
+    tool :search_music_artists, Tunez.Music.Artist, :search do
+      description "List music artists, optionally filtering by name. Requires no inputs; query is optional. Returns public artist fields and loaded catalogue summaries without mutating data."
+    end
+  end
 
   graphql do
     queries do
@@ -46,6 +54,18 @@ defmodule Tunez.Music do
     resource Tunez.Music.Artist do
       define :create_artist, action: :create
       define :read_artists, action: :read
+
+      define :browse_artists,
+        action: :browse,
+        default_options: [
+          load: [
+            :follower_count,
+            :followed_by_me,
+            :album_count,
+            :latest_album_year_released,
+            :cover_image_url
+          ]
+        ]
 
       define :search_artists,
         action: :search,

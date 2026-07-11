@@ -23,8 +23,6 @@ defmodule TunezWeb.Music.AlbumTest do
       artist = generate(artist())
       actor = generate(user(role: :admin))
       [%{id: follower_id} = follower, _nonfollower] = generate_many(user(), 2)
-      TunezWeb.Endpoint.subscribe("notifications:#{follower_id}")
-
       Music.follow_artist!(artist, actor: follower)
 
       %{id: album_id} =
@@ -39,10 +37,6 @@ defmodule TunezWeb.Music.AlbumTest do
 
       assert notification.user_id == follower_id
       assert notification.album_id == album_id
-
-      assert_received(%Phoenix.Socket.Broadcast{
-        payload: %{album_id: ^album_id, user_id: ^follower_id}
-      })
     end
   end
 
@@ -73,17 +67,13 @@ defmodule TunezWeb.Music.AlbumTest do
       assert Enum.map(notifications, & &1.id) == [to_stay_id]
     end
 
-    test "sends pubsub notifications about the notification deletion" do
+    test "deletes the notification through the resource notifier path" do
       follower = generate(user())
       album = generate(album())
       %{id: notification_id} = generate(notification(album_id: album.id, user_id: follower.id))
-      TunezWeb.Endpoint.subscribe("notifications:#{follower.id}")
-
       Music.destroy_album!(album, authorize?: false)
 
-      assert_received %Phoenix.Socket.Broadcast{
-        payload: %{id: ^notification_id}
-      }
+      assert {:error, _error} = Ash.get(Tunez.Accounts.Notification, notification_id)
     end
   end
 

@@ -28,7 +28,15 @@ config :ash,
   read_action_after_action_hooks_in_order?: true,
   bulk_actions_default_to_errors?: true,
   transaction_rollback_on_error?: true,
-  known_types: [AshPostgres.Timestamptz, AshPostgres.TimestamptzUsec]
+  known_types: [AshPostgres.Timestamptz, AshPostgres.TimestamptzUsec],
+  custom_expressions: [
+    AshBlueprint.Expressions.Humanize,
+    AshBlueprint.Expressions.RelativeTime,
+    AshBlueprint.Expressions.TimeAgoInWords,
+    AshBlueprint.Expressions.Truncate,
+    AshBlueprint.Expressions.StripPrefix,
+    AshBlueprint.Expressions.ClassJoin
+  ]
 
 config :spark,
   formatter: [
@@ -43,18 +51,18 @@ config :spark,
         :postgres,
         :resource,
         :code_interface,
-        :actions,
         :policies,
-        :pub_sub,
-        :preparations,
-        :changes,
-        :validations,
-        :multitenancy,
         :attributes,
         :relationships,
         :calculations,
         :aggregates,
-        :identities
+        :identities,
+        :pub_sub,
+        :preparations,
+        :changes,
+        :validations,
+        :actions,
+        :multitenancy
       ]
     ],
     "Ash.Domain": [
@@ -73,8 +81,15 @@ config :spark,
 config :tunez,
   ecto_repos: [Tunez.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: [Tunez.Accounts, Tunez.Music],
+  ash_domains: [Tunez.Accounts, Tunez.Music, Tunez.UI],
   ash_authentication: [return_error_on_invalid_magic_link_token?: true]
+
+config :tunez,
+  root_layout_stylesheets: ["/assets/app.css"],
+  root_layout_application_scripts: [],
+  root_layout_title_suffix: " · Tunez"
+
+config :ash_blueprint_phoenix, otp_app: :tunez
 
 # Configures the endpoint
 config :tunez, TunezWeb.Endpoint,

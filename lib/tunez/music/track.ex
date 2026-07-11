@@ -4,7 +4,8 @@ defmodule Tunez.Music.Track do
     domain: Tunez.Music,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshGraphql.Resource, AshJsonApi.Resource]
+    extensions: [AshGraphql.Resource, AshJsonApi.Resource],
+    notifiers: [AshBlueprint.Notifier]
 
   graphql do
     type :track
@@ -25,7 +26,12 @@ defmodule Tunez.Music.Track do
   end
 
   actions do
-    defaults [:read, :destroy]
+    defaults [:read]
+
+    destroy :destroy do
+      primary? true
+      require_atomic? false
+    end
 
     create :create do
       primary? true
