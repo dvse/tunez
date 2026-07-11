@@ -86,7 +86,8 @@ defmodule Tunez.UI.ArtistFormPage do
                                   on_input: :edit
                                 ],
                                 []
-                              )
+                              ),
+                            error: text(field_errors(:name))
                           }),
                           render(Tunez.UI.FormControl, %{
                             label: "Biography",
@@ -102,7 +103,8 @@ defmodule Tunez.UI.ArtistFormPage do
                                 [
                                   text(biography)
                                 ]
-                              )
+                              ),
+                            error: text(field_errors(:biography))
                           }),
                           box(:form_actions, [], [button(:form_button, [], [text("Save")])])
                         ])
@@ -191,6 +193,14 @@ defmodule Tunez.UI.ArtistFormPage do
               Ash.Changeset.force_change_attribute(changeset, :saved_artist_id, artist.id)
 
             {:error, error} ->
+              {:ok, _flash} =
+                Tunez.UI.put_flash(
+                  changeset.data.session_id,
+                  :error,
+                  "Could not save artist data",
+                  scope: context
+                )
+
               Ash.Changeset.add_error(changeset, error)
           end
         end)

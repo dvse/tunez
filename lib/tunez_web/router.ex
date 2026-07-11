@@ -33,8 +33,7 @@ defmodule TunezWeb.Router do
 
     live_session :ash_blueprint,
       on_mount: [
-        {AshBlueprint.Phoenix.LiveSession, :live_user_optional},
-        {TunezWeb.LiveUserAuth, :blueprint_flash}
+        {AshBlueprint.Phoenix.LiveSession, :live_user_optional}
       ],
       session: {AshBlueprint.Phoenix.LiveSession, :generate_session, [:tunez]} do
       ash_blueprint_routes(domains: [Tunez.UI])

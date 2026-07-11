@@ -100,7 +100,8 @@ defmodule Tunez.UI.AlbumFormPage do
                                       on_input: :edit
                                     ],
                                     []
-                                  )
+                                  ),
+                                error: text(field_errors(:name))
                               })
                             ]),
                             box(:album_year_field, [], [
@@ -118,7 +119,8 @@ defmodule Tunez.UI.AlbumFormPage do
                                       on_input: :edit
                                     ],
                                     []
-                                  )
+                                  ),
+                                error: text(field_errors(:year_released))
                               })
                             ])
                           ]),
@@ -135,7 +137,8 @@ defmodule Tunez.UI.AlbumFormPage do
                                   on_input: :edit
                                 ],
                                 []
-                              )
+                              ),
+                            error: text(field_errors(:cover_image_url))
                           }),
                           heading(:page_h2, [level: 2], [text("Tracks")]),
                           table(:track_editor_table, [], [
@@ -165,54 +168,42 @@ defmodule Tunez.UI.AlbumFormPage do
                                         inline(:track_editor_handle, [], [])
                                       ]),
                                       cell(:track_editor_cell, [], [
-                                        render(Tunez.UI.FormControl, %{
-                                          label: "Name",
-                                          dom_id:
-                                            "album_form_tracks_" <>
-                                              to_string(index(:track_index)) <> "_name",
-                                          hidden_label?: true,
-                                          control:
-                                            input(
-                                              :form_input,
-                                              [
-                                                dom_id:
-                                                  "album_form_tracks_" <>
-                                                    to_string(index(:track_index)) <> "_name",
-                                                value: track.name,
-                                                on_input: :set_track_name,
-                                                action_input: %{
-                                                  track_key: track.id,
-                                                  name: event(:value)
-                                                }
-                                              ],
-                                              []
-                                            )
-                                        })
+                                        input(
+                                          :form_input,
+                                          [
+                                            dom_id:
+                                              "album_form_tracks_" <>
+                                                to_string(index(:track_index)) <> "_name",
+                                            name: "track_" <> track.id <> "_name",
+                                            aria: [label: "Name"],
+                                            value: track.name,
+                                            on_input: :set_track_name,
+                                            action_input: %{
+                                              track_key: track.id,
+                                              name: event(:value)
+                                            }
+                                          ],
+                                          []
+                                        )
                                       ]),
                                       cell(:track_editor_duration, [], [
-                                        render(Tunez.UI.FormControl, %{
-                                          label: "Duration",
-                                          dom_id:
-                                            "album_form_tracks_" <>
-                                              to_string(index(:track_index)) <> "_duration",
-                                          hidden_label?: true,
-                                          control:
-                                            input(
-                                              :form_input,
-                                              [
-                                                dom_id:
-                                                  "album_form_tracks_" <>
-                                                    to_string(index(:track_index)) <> "_duration",
-                                                value: track.duration,
-                                                on_input: :set_track_duration,
-                                                action_input: %{
-                                                  track_key: track.id,
-                                                  duration: event(:value)
-                                                }
-                                              ],
-                                              []
-                                            )
-                                        })
+                                        input(
+                                          :form_input,
+                                          [
+                                            dom_id:
+                                              "album_form_tracks_" <>
+                                                to_string(index(:track_index)) <> "_duration",
+                                            name: "track_" <> track.id <> "_duration",
+                                            aria: [label: "Duration"],
+                                            value: track.duration,
+                                            on_input: :set_track_duration,
+                                            action_input: %{
+                                              track_key: track.id,
+                                              duration: event(:value)
+                                            }
+                                          ],
+                                          []
+                                        )
                                       ]),
                                       cell(:track_editor_delete, [], [
                                         link(
@@ -444,6 +435,14 @@ defmodule Tunez.UI.AlbumFormPage do
               )
 
             {:error, error} ->
+              {:ok, _flash} =
+                Tunez.UI.put_flash(
+                  changeset.data.session_id,
+                  :error,
+                  "Could not save album data",
+                  scope: context
+                )
+
               # the domain error IS the dispatch result
               Ash.Changeset.add_error(changeset, error)
           end
@@ -451,6 +450,4 @@ defmodule Tunez.UI.AlbumFormPage do
       end
     end
   end
-
-  # helper: editable_tracks/1 — shared relationship-to-draft projection for five track actions
 end
