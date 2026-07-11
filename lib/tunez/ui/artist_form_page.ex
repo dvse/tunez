@@ -161,6 +161,9 @@ defmodule Tunez.UI.ArtistFormPage do
           data = changeset.data
           session_id = data.session_id
 
+          # the SAVE-side mirror of the view's declared overlay
+          # (value: coalesce(draft, artist.field)) — one semantics, two
+          # readers, until expr-calcs load through ETS boundary reads
           input = %{
             name: data.name || (data.artist && data.artist.name),
             biography: data.biography || (data.artist && data.artist.biography)
