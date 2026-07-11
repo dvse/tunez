@@ -11,7 +11,11 @@ defmodule Tunez.UI.Navigation do
   end
 
   policies do
-    policy action([:read, :mount]) do
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    policy action(:mount) do
       authorize_if always()
     end
 
