@@ -231,19 +231,8 @@ defmodule Tunez.UI.ArtistShowPage do
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
           case Tunez.Music.follow_artist(changeset.data.artist, scope: context) do
-            {:ok, _follow} ->
-              changeset
-
-            {:error, _error} ->
-              {:ok, _flash} =
-                Tunez.UI.put_flash(
-                  changeset.data.session_id,
-                  :error,
-                  "Could not follow artist",
-                  scope: context
-                )
-
-              changeset
+            {:ok, _follow} -> changeset
+            {:error, error} -> Ash.Changeset.add_error(changeset, error)
           end
         end)
       end
@@ -255,19 +244,8 @@ defmodule Tunez.UI.ArtistShowPage do
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
           case Tunez.Music.unfollow_artist(changeset.data.artist, scope: context) do
-            :ok ->
-              changeset
-
-            {:error, _error} ->
-              {:ok, _flash} =
-                Tunez.UI.put_flash(
-                  changeset.data.session_id,
-                  :error,
-                  "Could not unfollow artist",
-                  scope: context
-                )
-
-              changeset
+            :ok -> changeset
+            {:error, error} -> Ash.Changeset.add_error(changeset, error)
           end
         end)
       end
@@ -282,16 +260,21 @@ defmodule Tunez.UI.ArtistShowPage do
           album_id = Ash.Changeset.get_argument(changeset, :album_id)
           album = Enum.find(changeset.data.artist.albums, &(&1.id == album_id))
 
-          {level, message} =
-            case Tunez.Music.destroy_album(album, scope: context) do
-              :ok -> {:info, "Album deleted successfully"}
-              {:error, _error} -> {:error, "Could not delete album"}
-            end
+          case Tunez.Music.destroy_album(album, scope: context) do
+            :ok ->
+              {:ok, _flash} =
+                Tunez.UI.put_flash(
+                  changeset.data.session_id,
+                  :info,
+                  "Album deleted successfully",
+                  scope: context
+                )
 
-          {:ok, _flash} =
-            Tunez.UI.put_flash(changeset.data.session_id, level, message, scope: context)
+              changeset
 
-          changeset
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, error)
+          end
         end)
       end
     end
@@ -301,20 +284,20 @@ defmodule Tunez.UI.ArtistShowPage do
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
-          result = Tunez.Music.destroy_artist(changeset.data.artist, scope: context)
+          case Tunez.Music.destroy_artist(changeset.data.artist, scope: context) do
+            :ok ->
+              {:ok, _flash} =
+                Tunez.UI.put_flash(
+                  changeset.data.session_id,
+                  :info,
+                  "Artist deleted successfully",
+                  scope: context
+                )
 
-          {level, message} =
-            case result do
-              :ok -> {:info, "Artist deleted successfully"}
-              {:error, _error} -> {:error, "Could not delete artist"}
-            end
+              Ash.Changeset.force_change_attribute(changeset, :deleted?, true)
 
-          {:ok, _flash} =
-            Tunez.UI.put_flash(changeset.data.session_id, level, message, scope: context)
-
-          case result do
-            :ok -> Ash.Changeset.force_change_attribute(changeset, :deleted?, true)
-            {:error, _error} -> changeset
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, error)
           end
         end)
       end

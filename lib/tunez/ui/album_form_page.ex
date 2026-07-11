@@ -96,9 +96,8 @@ defmodule Tunez.UI.AlbumFormPage do
                                     [
                                       dom_id: "album_form_name",
                                       name: "name",
-                                      value: coalesce(name, album.name),
-                                      on_input: :set_name,
-                                      action_input: %{name: event(:value)}
+                                      value: name,
+                                      on_input: :edit
                                     ],
                                     []
                                   )
@@ -115,9 +114,8 @@ defmodule Tunez.UI.AlbumFormPage do
                                       type: :number,
                                       dom_id: "album_form_year_released",
                                       name: "year_released",
-                                      value: coalesce(year_released, album.year_released),
-                                      on_input: :set_year_released,
-                                      action_input: %{year_released: event(:value)}
+                                      value: year_released,
+                                      on_input: :edit
                                     ],
                                     []
                                   )
@@ -133,9 +131,8 @@ defmodule Tunez.UI.AlbumFormPage do
                                 [
                                   dom_id: "album_form_cover_image_url",
                                   name: "cover_image_url",
-                                  value: coalesce(cover_image_url, album.cover_image_url),
-                                  on_input: :set_cover_image_url,
-                                  action_input: %{cover_image_url: event(:value)}
+                                  value: cover_image_url,
+                                  on_input: :edit
                                 ],
                                 []
                               )
@@ -156,7 +153,7 @@ defmodule Tunez.UI.AlbumFormPage do
                               [dom_id: "trackSort", reorder: [action: :reorder_tracks]],
                               [
                                 each(
-                                  coalesce(track_drafts, coalesce(album.tracks, [])),
+                                  track_drafts,
                                   :track,
                                   [
                                     key: track.id,
@@ -272,20 +269,37 @@ defmodule Tunez.UI.AlbumFormPage do
       change set_attribute(:album_id, arg(:album_id))
       # handoff state is mount-reset: re-entry always gives a fresh form
       change set_attribute(:saved_artist_id, nil)
-      change set_attribute(:track_drafts, nil)
       change load([:artist, :album])
+
+      # mount-seeded drafts: the form edits a snapshot of the album
+      change fn changeset, context ->
+        Ash.Changeset.before_action(changeset, fn changeset ->
+          album =
+            case Ash.Changeset.get_attribute(changeset, :album_id) do
+              nil -> nil
+              album_id -> Tunez.Music.get_album_by_id!(album_id, load: [:tracks], scope: context)
+            end
+
+          changeset
+          |> Ash.Changeset.force_change_attribute(:name, (album && album.name) || "")
+          |> Ash.Changeset.force_change_attribute(:year_released, album && album.year_released)
+          |> Ash.Changeset.force_change_attribute(
+            :cover_image_url,
+            (album && album.cover_image_url) || ""
+          )
+          |> Ash.Changeset.force_change_attribute(
+            :track_drafts,
+            Enum.map((album && album.tracks) || [], fn track ->
+              %{id: track.id, track_id: track.id, name: track.name, duration: track.duration}
+            end)
+          )
+        end)
+      end
     end
 
-    update :set_name do
-      accept [:name]
-    end
-
-    update :set_year_released do
-      accept [:year_released]
-    end
-
-    update :set_cover_image_url do
-      accept [:cover_image_url]
+    # ONE accept-style edit action: every scalar field binds BY NAME
+    update :edit do
+      accept [:name, :year_released, :cover_image_url]
     end
 
     update :add_track do
@@ -295,7 +309,7 @@ defmodule Tunez.UI.AlbumFormPage do
         Ash.Changeset.change_attribute(
           changeset,
           :track_drafts,
-          editable_tracks(changeset) ++ [%{}]
+          (changeset.data.track_drafts || []) ++ [%{}]
         )
       end
     end
@@ -309,7 +323,7 @@ defmodule Tunez.UI.AlbumFormPage do
 
         tracks =
           Enum.reject(
-            editable_tracks(changeset),
+            changeset.data.track_drafts || [],
             &(&1.id == track_key)
           )
 
@@ -325,7 +339,7 @@ defmodule Tunez.UI.AlbumFormPage do
         constraints: [items: [min: 0]]
 
       change fn changeset, _context ->
-        tracks = editable_tracks(changeset)
+        tracks = changeset.data.track_drafts || []
 
         reordered =
           changeset
@@ -348,7 +362,7 @@ defmodule Tunez.UI.AlbumFormPage do
 
         tracks =
           Enum.map(
-            editable_tracks(changeset),
+            changeset.data.track_drafts || [],
             &if(&1.id == track_key, do: %{&1 | name: name}, else: &1)
           )
 
@@ -367,7 +381,7 @@ defmodule Tunez.UI.AlbumFormPage do
 
         tracks =
           Enum.map(
-            editable_tracks(changeset),
+            changeset.data.track_drafts || [],
             &if(&1.id == track_key,
               do: %{&1 | duration: duration},
               else: &1
@@ -392,17 +406,15 @@ defmodule Tunez.UI.AlbumFormPage do
 
           cover_image_url =
             Ash.Changeset.get_argument(changeset, :cover_image_url) ||
-              changeset.data.cover_image_url || (album && album.cover_image_url) || ""
+              changeset.data.cover_image_url || ""
 
           input = %{
-            name:
-              Ash.Changeset.get_argument(changeset, :name) || changeset.data.name ||
-                (album && album.name) || "",
+            name: Ash.Changeset.get_argument(changeset, :name) || changeset.data.name,
             year_released:
               Ash.Changeset.get_argument(changeset, :year_released) ||
-                changeset.data.year_released || (album && album.year_released),
+                changeset.data.year_released,
             cover_image_url: if(cover_image_url == "", do: nil, else: cover_image_url),
-            tracks: editable_tracks(changeset)
+            tracks: changeset.data.track_drafts || []
           }
 
           result =
@@ -441,14 +453,4 @@ defmodule Tunez.UI.AlbumFormPage do
   end
 
   # helper: editable_tracks/1 — shared relationship-to-draft projection for five track actions
-  defp editable_tracks(changeset) do
-    changeset.data.track_drafts ||
-      if is_nil(changeset.data.album) do
-        []
-      else
-        Enum.map(changeset.data.album.tracks, fn track ->
-          %{id: track.id, track_id: track.id, name: track.name, duration: track.duration}
-        end)
-      end
-  end
 end

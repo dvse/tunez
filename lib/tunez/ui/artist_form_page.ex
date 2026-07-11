@@ -82,9 +82,8 @@ defmodule Tunez.UI.ArtistFormPage do
                                 [
                                   dom_id: "artist_form_name",
                                   name: "name",
-                                  value: coalesce(name, artist.name),
-                                  on_input: :set_name,
-                                  action_input: %{name: event(:value)}
+                                  value: name,
+                                  on_input: :edit
                                 ],
                                 []
                               )
@@ -98,11 +97,10 @@ defmodule Tunez.UI.ArtistFormPage do
                                 [
                                   dom_id: "artist_form_biography",
                                   name: "biography",
-                                  on_input: :set_biography,
-                                  action_input: %{biography: event(:value)}
+                                  on_input: :edit
                                 ],
                                 [
-                                  text(coalesce(biography, coalesce(artist.biography, "")))
+                                  text(biography)
                                 ]
                               )
                           }),
@@ -131,14 +129,31 @@ defmodule Tunez.UI.ArtistFormPage do
       # handoff state is mount-reset: re-entry always gives a fresh form
       change set_attribute(:saved_artist_id, nil)
       change load(:artist)
+
+      # mount-seeded drafts: the form edits a snapshot of the artist
+      change fn changeset, context ->
+        Ash.Changeset.before_action(changeset, fn changeset ->
+          artist =
+            case Ash.Changeset.get_attribute(changeset, :artist_id) do
+              nil -> nil
+              artist_id -> Tunez.Music.get_artist_by_id!(artist_id, scope: context)
+            end
+
+          changeset
+          |> Ash.Changeset.force_change_attribute(:name, (artist && artist.name) || "")
+          |> Ash.Changeset.force_change_attribute(
+            :biography,
+            (artist && artist.biography) || ""
+          )
+        end)
+      end
     end
 
-    update :set_name do
-      accept [:name]
-    end
-
-    update :set_biography do
-      accept [:biography]
+    # ONE accept-style edit action: every field binds to it BY NAME —
+    # the targeted field arrives normalized, no per-field actions, no
+    # action_input plumbing
+    update :edit do
+      accept [:name, :biography]
     end
 
     update :save do
@@ -151,12 +166,9 @@ defmodule Tunez.UI.ArtistFormPage do
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
           input = %{
-            name:
-              Ash.Changeset.get_argument(changeset, :name) || changeset.data.name ||
-                (changeset.data.artist && changeset.data.artist.name) || "",
+            name: Ash.Changeset.get_argument(changeset, :name) || changeset.data.name,
             biography:
-              Ash.Changeset.get_argument(changeset, :biography) || changeset.data.biography ||
-                (changeset.data.artist && changeset.data.artist.biography) || ""
+              Ash.Changeset.get_argument(changeset, :biography) || changeset.data.biography
           }
 
           result =
@@ -179,8 +191,6 @@ defmodule Tunez.UI.ArtistFormPage do
               Ash.Changeset.force_change_attribute(changeset, :saved_artist_id, artist.id)
 
             {:error, error} ->
-              # the domain error IS the dispatch result — field-path'd
-              # errors reach the bound controls, nothing converts to flash
               Ash.Changeset.add_error(changeset, error)
           end
         end)

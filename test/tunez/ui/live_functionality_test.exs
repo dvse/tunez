@@ -53,8 +53,10 @@ defmodule Tunez.UI.LiveFunctionalityTest do
       |> visit(~p"/")
       |> fill_in("Search", with: "e")
       |> submit()
-      |> assert_path("/", query_params: %{q: "e", sort_by: "-updated_at"})
-      |> visit(~p"/?q=e&sort_by=-updated_at")
+      # the URL serializes only DIVERGENCE from the declaration: sort_by
+      # sits at its declared default and drops out of the projection
+      |> assert_path("/", query_params: %{q: "e"})
+      |> visit(~p"/?q=e")
       |> assert_ordered_artists(["omega", "beta"])
     end
   end

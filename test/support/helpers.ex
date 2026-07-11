@@ -47,7 +47,7 @@ defmodule Tunez.Support.Helpers do
   # ------ Selectors --------------------------------------------------------
 
   @doc "HTML selector for flash messages."
-  def flash(type), do: ":not(#server-error, #client-error) > div.flash-#{type}"
+  def flash(type), do: "[part='flash_message'][data-kind='#{type}']"
 
   def link(href), do: "a[href='#{href}']"
 
