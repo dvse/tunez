@@ -177,6 +177,24 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       assert_raise Ash.Error.Forbidden, fn -> visit(conn, ~p"/albums/#{album.id}/edit") end
     end
 
+    test "editors can mount only albums they created", %{conn: conn} do
+      editor = generate(user(role: :editor))
+      admin = generate(user(role: :admin))
+      owned = generate(album(actor: editor))
+      unowned = generate(album(actor: admin))
+      conn = log_in_user(conn, editor)
+
+      conn
+      |> visit(~p"/albums/#{owned.id}/edit")
+      |> assert_has("h1", text: "Update Album")
+
+      assert_raise Ash.Error.Invalid, fn -> visit(conn, ~p"/albums/#{unowned.id}/edit") end
+
+      assert Tunez.UI.AlbumFormPage
+             |> Ash.read!(authorize?: false)
+             |> Enum.all?(&(&1.album_id != unowned.id))
+    end
+
     test "admin creates an album with editable embedded track rows", %{conn: conn} do
       artist = generate(artist())
 
@@ -224,9 +242,9 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       assert album.year_released == 2021
       assert album.cover_image_url == "/images/sample.jpg"
 
-      assert Enum.map(album.tracks, &{&1.name, &1.duration}) == [
-               {"First Track", "2:22"},
-               {"Second Track", "3:33"}
+      assert Enum.map(album.tracks, &{&1.name, &1.duration_seconds}) == [
+               {"First Track", 142},
+               {"Second Track", 213}
              ]
     end
 
@@ -295,9 +313,9 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       assert updated_album.year_released == 2024
       assert updated_album.cover_image_url == "/images/updated.jpg"
 
-      assert Enum.map(updated_album.tracks, &{&1.name, &1.duration}) == [
-               {"Edited Existing Track", "4:44"},
-               {"Added Track", "5:55"}
+      assert Enum.map(updated_album.tracks, &{&1.name, &1.duration_seconds}) == [
+               {"Edited Existing Track", 284},
+               {"Added Track", 355}
              ]
 
       assert hd(updated_album.tracks).id == kept_track.id

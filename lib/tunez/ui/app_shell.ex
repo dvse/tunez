@@ -1,6 +1,5 @@
 defmodule Tunez.UI.AppShell do
   use Ash.Resource,
-    otp_app: :tunez,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
     extensions: [AshBlueprint],
@@ -11,22 +10,17 @@ defmodule Tunez.UI.AppShell do
   end
 
   policies do
-    policy action_type(:read) do
+    policy action_type([:read, :create]) do
       authorize_if always()
     end
 
-    policy action(:mount) do
-      authorize_if always()
-    end
-
-    policy action(:toggle_menu) do
+    policy action([:toggle_menu, :close_menu]) do
       authorize_if actor_present()
     end
   end
 
   attributes do
-    uuid_primary_key :id
-    attribute :session_id, :uuid, allow_nil?: false, public?: false
+    attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
     attribute :signed_in?, :boolean, allow_nil?: false, default: false, public?: true
 
     attribute :email, :string,
@@ -37,8 +31,17 @@ defmodule Tunez.UI.AppShell do
 
     attribute :menu_open?, :boolean, allow_nil?: false, default: false
     attribute :avatar_seed, :string, allow_nil?: false, default: ""
-
     attribute :content, AshBlueprint.Type.RenderTree, public?: true
+  end
+
+  relationships do
+    has_one :notifications_page, Tunez.UI.NotificationsPage,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
+
+    has_one :flash_stack, Tunez.UI.FlashStack,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
   end
 
   calculations do
@@ -60,7 +63,12 @@ defmodule Tunez.UI.AppShell do
                           box(:user_menu_container, [], [
                             box(
                               :avatar_toggle,
-                              [tabindex: 0, role: "button", on_click: :toggle_menu],
+                              [
+                                tabindex: 0,
+                                role: "button",
+                                on_click: :toggle_menu,
+                                on_click_away: :close_menu
+                              ],
                               [
                                 image(
                                   :avatar,
@@ -78,7 +86,6 @@ defmodule Tunez.UI.AppShell do
                               [
                                 dom_id: "user-menu",
                                 tabindex: 0,
-                                open: menu_open?,
                                 state: [open: menu_open?]
                               ],
                               [
@@ -140,6 +147,10 @@ defmodule Tunez.UI.AppShell do
 
     update :toggle_menu do
       change atomic_update(:menu_open?, expr(not menu_open?))
+    end
+
+    update :close_menu do
+      change set_attribute(:menu_open?, false)
     end
   end
 end

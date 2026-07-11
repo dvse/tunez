@@ -21,6 +21,32 @@ defmodule Tunez.Music.ArtistFollower do
     end
   end
 
+  policies do
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    policy action_type(:create) do
+      authorize_if actor_present()
+    end
+
+    policy action_type(:destroy) do
+      authorize_if actor_present()
+    end
+  end
+
+  relationships do
+    belongs_to :artist, Tunez.Music.Artist do
+      primary_key? true
+      allow_nil? false
+    end
+
+    belongs_to :follower, Tunez.Accounts.User do
+      primary_key? true
+      allow_nil? false
+    end
+  end
+
   actions do
     defaults [:read]
 
@@ -46,32 +72,6 @@ defmodule Tunez.Music.ArtistFollower do
       end
 
       change filter expr(artist_id == ^arg(:artist_id) && follower_id == ^actor(:id))
-    end
-  end
-
-  policies do
-    policy action_type(:read) do
-      authorize_if always()
-    end
-
-    policy action_type(:create) do
-      authorize_if actor_present()
-    end
-
-    policy action_type(:destroy) do
-      authorize_if actor_present()
-    end
-  end
-
-  relationships do
-    belongs_to :artist, Tunez.Music.Artist do
-      primary_key? true
-      allow_nil? false
-    end
-
-    belongs_to :follower, Tunez.Accounts.User do
-      primary_key? true
-      allow_nil? false
     end
   end
 end

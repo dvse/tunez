@@ -1,6 +1,5 @@
 defmodule Tunez.UI.ArtistIndexPage do
   use Ash.Resource,
-    otp_app: :tunez,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
     extensions: [AshBlueprint],
@@ -13,7 +12,7 @@ defmodule Tunez.UI.ArtistIndexPage do
   routes do
     route "/" do
       query :q, :string
-      query :sort_by, :atom
+      query :sort_by, :string
       query :limit, :integer
       query :offset, :integer
     end
@@ -26,8 +25,7 @@ defmodule Tunez.UI.ArtistIndexPage do
   end
 
   attributes do
-    uuid_primary_key :id
-    attribute :session_id, :uuid, allow_nil?: false, public?: false
+    attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
 
     attribute :q, :string,
       allow_nil?: false,
@@ -65,6 +63,14 @@ defmodule Tunez.UI.ArtistIndexPage do
   end
 
   relationships do
+    has_one :app_shell, Tunez.UI.AppShell,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
+
+    has_many :page_headers, Tunez.UI.PageHeader,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
+
     has_many :artists, Tunez.Music.Artist do
       no_attributes? true
       manual {Tunez.UI.ArtistIndexPage.ArtistsRelationship, mode: :page}
@@ -77,6 +83,8 @@ defmodule Tunez.UI.ArtistIndexPage do
   end
 
   calculations do
+    calculate :page_title, :string, expr("Artists"), public?: true
+
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -86,7 +94,7 @@ defmodule Tunez.UI.ArtistIndexPage do
                   content: [
                     render(Tunez.UI.PageHeader, %{
                       kind: :fixed,
-                      menu_id: "dropdown_" <> id,
+                      menu_id: "dropdown_" <> to_string(session_id),
                       title: heading(:page_h1, [level: 1], [text("Artists")]),
                       actions: [
                         form(
@@ -99,7 +107,6 @@ defmodule Tunez.UI.ArtistIndexPage do
                           [
                             box(:sort_control, [], [
                               label(:field_label, [for: "sort_by"], [text("sort by:")]),
-                              inline(:sort_gap, [], []),
                               select(
                                 :sort_select,
                                 [dom_id: "sort_by", name: "sort_by"],
@@ -139,8 +146,7 @@ defmodule Tunez.UI.ArtistIndexPage do
                           :search_form,
                           [
                             data: [role: "artist-search"],
-                            on_submit: :search,
-                            action_input: %{query: q}
+                            on_submit: :search
                           ],
                           [
                             inline(:search_icon, [], []),
@@ -153,10 +159,9 @@ defmodule Tunez.UI.ArtistIndexPage do
                                   :search_input,
                                   [
                                     dom_id: "search-text",
-                                    name: "query",
+                                    name: "q",
                                     value: q,
-                                    on_input: :set_query,
-                                    action_input: %{query: event(:value)}
+                                    on_input: :set_query
                                   ],
                                   []
                                 )
@@ -196,21 +201,33 @@ defmodule Tunez.UI.ArtistIndexPage do
                     ]),
                     if not is_nil(next_artist) or offset > 0 do
                       box(:pagination, [], [
-                        button(
+                        link(
                           :primary_link_inverse,
                           [
-                            type: :button,
-                            on_click: :previous_page,
+                            to:
+                              "/?sort_by=" <>
+                                to_string(sort_by) <>
+                                if(q == "", do: "", else: "&q=" <> q) <>
+                                "&limit=" <>
+                                to_string(limit) <>
+                                "&offset=" <>
+                                to_string(if(offset > limit, do: offset - limit, else: 0)),
                             data: [role: "previous-page"],
                             disabled: offset == 0
                           ],
                           [text("« Previous")]
                         ),
-                        button(
+                        link(
                           :primary_link_inverse,
                           [
-                            type: :button,
-                            on_click: :next_page,
+                            to:
+                              "/?sort_by=" <>
+                                to_string(sort_by) <>
+                                if(q == "", do: "", else: "&q=" <> q) <>
+                                "&limit=" <>
+                                to_string(limit) <>
+                                "&offset=" <>
+                                to_string(offset + limit),
                             data: [role: "next-page"],
                             disabled: is_nil(next_artist)
                           ],
@@ -233,46 +250,31 @@ defmodule Tunez.UI.ArtistIndexPage do
     defaults [:read]
 
     create :mount do
-      accept [:q, :sort_by, :limit, :offset]
+      accept [:q, :limit, :offset]
+      argument :sort_by, :string
       change AshBlueprint.Changes.SetSessionId
+
+      change set_attribute(:sort_by, arg(:sort_by)),
+        where: [
+          argument_in(:sort_by, [
+            "-updated_at",
+            "-inserted_at",
+            "name",
+            "-album_count",
+            "--latest_album_year_released",
+            "-follower_count",
+            "-followed_by_me"
+          ])
+        ]
     end
 
     update :search do
-      argument :query, :string do
-        allow_nil? false
-        constraints allow_empty?: true
-      end
-
-      change set_attribute(:q, arg(:query))
+      accept [:q]
       change set_attribute(:offset, 0)
     end
 
     update :set_query do
-      argument :query, :string, allow_nil?: false, constraints: [allow_empty?: true]
-      change set_attribute(:q, arg(:query))
-    end
-
-    update :previous_page do
-      change fn changeset, _context ->
-        offset = changeset.data.offset
-        limit = changeset.data.limit
-
-        Ash.Changeset.change_attribute(
-          changeset,
-          :offset,
-          if(offset > limit, do: offset - limit, else: 0)
-        )
-      end
-    end
-
-    update :next_page do
-      change fn changeset, _context ->
-        Ash.Changeset.change_attribute(
-          changeset,
-          :offset,
-          changeset.data.offset + changeset.data.limit
-        )
-      end
+      accept [:q]
     end
 
     update :change_sort do
@@ -287,35 +289,21 @@ defmodule Tunez.UI.ArtistIndexPage do
 
     def load(records, opts, context) do
       mode = Keyword.fetch!(opts, :mode)
-
       scope_opts = Ash.Scope.to_opts(context, authorize?: context.authorize?)
 
-      results =
-        Enum.map(records, fn page ->
-          {limit, offset} =
-            case mode do
-              :page -> {page.limit, page.offset}
-              :next -> {1, page.offset + page.limit}
-            end
+      {:ok,
+       Enum.map(records, fn page ->
+         {limit, offset} =
+           if mode == :next, do: {1, page.offset + page.limit}, else: {page.limit, page.offset}
 
-          case Tunez.Music.browse_artists(
-                 %{
-                   query: page.q,
-                   sort_by: page.sort_by,
-                   limit: limit,
-                   offset: offset
-                 },
-                 scope_opts
-               ) do
-            {:ok, artists} ->
-              if mode == :next, do: List.first(artists), else: artists
+         artists =
+           Tunez.Music.browse_artists!(
+             %{query: page.q, sort_by: page.sort_by, limit: limit, offset: offset},
+             scope_opts
+           )
 
-            {:error, error} ->
-              raise error
-          end
-        end)
-
-      {:ok, results}
+         if mode == :next, do: List.first(artists), else: artists
+       end)}
     end
   end
 end

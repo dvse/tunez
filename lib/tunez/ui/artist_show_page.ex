@@ -1,6 +1,5 @@
 defmodule Tunez.UI.ArtistShowPage do
   use Ash.Resource,
-    otp_app: :tunez,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
     extensions: [AshBlueprint],
@@ -13,21 +12,12 @@ defmodule Tunez.UI.ArtistShowPage do
   routes do
     route "/artists/:artist_id" do
       location(expr(if(deleted?, do: "/")))
-
       param(:artist_id, :uuid)
     end
   end
 
-  resource do
-    description "Artist details, releases, tracks, following, and catalogue management."
-  end
-
   policies do
-    policy action_type(:read) do
-      authorize_if always()
-    end
-
-    policy action(:mount) do
+    policy action_type([:read, :create]) do
       authorize_if always()
     end
 
@@ -41,13 +31,20 @@ defmodule Tunez.UI.ArtistShowPage do
   end
 
   attributes do
-    uuid_primary_key :id
-    attribute :session_id, :uuid, allow_nil?: false, public?: false
+    attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
     attribute :deleted?, :boolean, allow_nil?: false, default: false, public?: true
     attribute :artist_id, :uuid, allow_nil?: false, public?: true
   end
 
   relationships do
+    has_one :app_shell, Tunez.UI.AppShell,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
+
+    has_many :page_headers, Tunez.UI.PageHeader,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
+
     has_one :artist, Tunez.Music.Artist do
       source_attribute :artist_id
       destination_attribute :id
@@ -55,6 +52,8 @@ defmodule Tunez.UI.ArtistShowPage do
   end
 
   calculations do
+    calculate :page_title, :string, expr(artist.name), public?: true
+
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -63,7 +62,7 @@ defmodule Tunez.UI.ArtistShowPage do
                   email: to_string(^actor(:email)),
                   content: [
                     render(Tunez.UI.PageHeader, %{
-                      menu_id: "dropdown_" <> id,
+                      menu_id: "dropdown_" <> to_string(session_id),
                       title:
                         heading(:page_h1, [level: 1], [
                           text(artist.name),
@@ -91,35 +90,37 @@ defmodule Tunez.UI.ArtistShowPage do
                             text(join(artist.previous_names, ", "))
                           ])
                         end,
-                      actions: [
-                        if ^actor(:role) == :admin do
-                          link(
-                            :error_link,
-                            [
-                              to: "#",
-                              data: [
-                                confirm: "Are you sure you want to delete " <> artist.name <> "?"
-                              ],
-                              on_click: :destroy_artist,
-                              prevent_default: true
-                            ],
-                            [text("Delete Artist")]
-                          )
-                        else
-                          nothing()
-                        end,
+                      actions:
                         if ^actor(:role) in [:admin, :editor] do
-                          link(
-                            :primary_link_inverse,
-                            [to: "/artists/" <> artist_id <> "/edit"],
-                            [
-                              text("Edit Artist")
-                            ]
-                          )
+                          [
+                            if ^actor(:role) == :admin do
+                              link(
+                                :error_link,
+                                [
+                                  to: "#",
+                                  data: [
+                                    confirm:
+                                      "Are you sure you want to delete " <> artist.name <> "?"
+                                  ],
+                                  on_click: :destroy_artist,
+                                  prevent_default: true
+                                ],
+                                [text("Delete Artist")]
+                              )
+                            else
+                              nothing()
+                            end,
+                            link(
+                              :primary_link_inverse,
+                              [to: "/artists/" <> artist_id <> "/edit"],
+                              [
+                                text("Edit Artist")
+                              ]
+                            )
+                          ]
                         else
-                          nothing()
+                          nil
                         end
-                      ]
                     }),
                     box(:biography, [], [
                       each(
@@ -162,11 +163,32 @@ defmodule Tunez.UI.ArtistShowPage do
                                         " (" <> to_string(album.year_released) <> ")"
                                     ),
                                     text(" "),
-                                    if is_nil(album.duration) do
+                                    if is_nil(album.duration_seconds) do
                                       nothing()
                                     else
                                       inline(:album_duration, [], [
-                                        text("(" <> album.duration <> ")")
+                                        text(
+                                          "(" <>
+                                            at(
+                                              string_split(
+                                                to_string(
+                                                  round(
+                                                    (album.duration_seconds -
+                                                       rem(album.duration_seconds, 60)) / 60
+                                                  )
+                                                ),
+                                                "."
+                                              ),
+                                              0
+                                            ) <>
+                                            ":" <>
+                                            if(rem(album.duration_seconds, 60) < 10,
+                                              do:
+                                                "0" <>
+                                                  to_string(rem(album.duration_seconds, 60)),
+                                              else: to_string(rem(album.duration_seconds, 60))
+                                            ) <> ")"
+                                        )
                                       ])
                                     end
                                   ]),
@@ -208,10 +230,35 @@ defmodule Tunez.UI.ArtistShowPage do
                                   each(album.tracks, :track, [key: track.id], [
                                     row(:track_row, [], [
                                       header_cell(:track_number, [], [
-                                        text(to_string(track.number) <> ".")
+                                        text(
+                                          if track.number < 10,
+                                            do: "0" <> to_string(track.number) <> ".",
+                                            else: to_string(track.number) <> "."
+                                        )
                                       ]),
                                       cell(:track_name, [], [text(track.name)]),
-                                      cell(:track_duration, [], [text(track.duration)])
+                                      cell(:track_duration, [], [
+                                        text(
+                                          at(
+                                            string_split(
+                                              to_string(
+                                                round(
+                                                  (track.duration_seconds -
+                                                     rem(track.duration_seconds, 60)) / 60
+                                                )
+                                              ),
+                                              "."
+                                            ),
+                                            0
+                                          ) <>
+                                            ":" <>
+                                            if rem(track.duration_seconds, 60) < 10 do
+                                              "0" <> to_string(rem(track.duration_seconds, 60))
+                                            else
+                                              to_string(rem(track.duration_seconds, 60))
+                                            end
+                                        )
+                                      ])
                                     ])
                                   ])
                                 ])

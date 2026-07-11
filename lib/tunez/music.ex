@@ -1,7 +1,7 @@
 defmodule Tunez.Music do
   use Ash.Domain,
     otp_app: :tunez,
-    extensions: [AshAi, AshGraphql.Domain, AshJsonApi.Domain, AshPhoenix]
+    extensions: [AshAi, AshGraphql.Domain, AshJsonApi.Domain]
 
   tools do
     tool :search_music_artists, Tunez.Music.Artist, :search do
@@ -44,10 +44,6 @@ defmodule Tunez.Music do
         delete :destroy
       end
     end
-  end
-
-  forms do
-    form :create_album, args: [:artist_id]
   end
 
   resources do

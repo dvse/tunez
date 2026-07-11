@@ -13,7 +13,6 @@ defmodule Tunez.UI.ArtistCard do
   attributes do
     uuid_primary_key :id, writable?: true
     attribute :name, :string, allow_nil?: false, public?: true
-
     attribute :cover_image_url, :string, public?: true
     attribute :followed?, :boolean, allow_nil?: false, default: false, public?: true
     attribute :follower_count, :integer, allow_nil?: false, default: 0, public?: true
@@ -43,7 +42,17 @@ defmodule Tunez.UI.ArtistCard do
                     inline(:follower_count, [data: [role: "follower-count"]], [
                       inline(:follower_count_icon, [], []),
                       text(" "),
-                      text(to_string(follower_count))
+                      text(
+                        if follower_count >= 1_000_000 do
+                          to_string(round(follower_count / 1_000_000, 1)) <> "M"
+                        else
+                          if follower_count >= 1_000 do
+                            to_string(round(follower_count / 1_000, 1)) <> "K"
+                          else
+                            to_string(follower_count)
+                          end
+                        end
+                      )
                     ])
                   else
                     nothing()
@@ -66,18 +75,6 @@ defmodule Tunez.UI.ArtistCard do
   end
 
   actions do
-    create :create do
-      primary? true
-
-      accept [
-        :id,
-        :name,
-        :cover_image_url,
-        :followed?,
-        :follower_count,
-        :album_count,
-        :latest_album_year
-      ]
-    end
+    defaults create: :*
   end
 end

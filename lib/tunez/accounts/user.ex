@@ -69,6 +69,51 @@ defmodule Tunez.Accounts.User do
     repo Tunez.Repo
   end
 
+  policies do
+    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
+      authorize_if always()
+    end
+
+    policy action([:register_with_password, :sign_in_with_password]) do
+      authorize_if always()
+    end
+  end
+
+  attributes do
+    uuid_primary_key :id
+
+    attribute :email, :ci_string do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :hashed_password, :string do
+      sensitive? true
+    end
+
+    attribute :role, Tunez.Accounts.Role do
+      allow_nil? false
+      default :user
+    end
+
+    attribute :confirmed_at, :utc_datetime_usec
+  end
+
+  relationships do
+    has_many :follower_relationships, Tunez.Music.ArtistFollower do
+      destination_attribute :follower_id
+    end
+
+    many_to_many :followed_artists, Tunez.Music.Artist do
+      join_relationship :follower_relationships
+      source_attribute_on_join_resource :follower_id
+    end
+  end
+
+  identities do
+    identity :unique_email, [:email]
+  end
+
   actions do
     defaults [:read]
 
@@ -278,50 +323,5 @@ defmodule Tunez.Accounts.User do
     update :set_role do
       accept [:role]
     end
-  end
-
-  policies do
-    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
-      authorize_if always()
-    end
-
-    policy action([:register_with_password, :sign_in_with_password]) do
-      authorize_if always()
-    end
-  end
-
-  attributes do
-    uuid_primary_key :id
-
-    attribute :email, :ci_string do
-      allow_nil? false
-      public? true
-    end
-
-    attribute :hashed_password, :string do
-      sensitive? true
-    end
-
-    attribute :role, Tunez.Accounts.Role do
-      allow_nil? false
-      default :user
-    end
-
-    attribute :confirmed_at, :utc_datetime_usec
-  end
-
-  relationships do
-    has_many :follower_relationships, Tunez.Music.ArtistFollower do
-      destination_attribute :follower_id
-    end
-
-    many_to_many :followed_artists, Tunez.Music.Artist do
-      join_relationship :follower_relationships
-      source_attribute_on_join_resource :follower_id
-    end
-  end
-
-  identities do
-    identity :unique_email, [:email]
   end
 end

@@ -2,7 +2,10 @@ defmodule Tunez.UI do
   use Ash.Domain, otp_app: :tunez
 
   resources do
-    resource Tunez.UI.AlbumFormPage
+    resource Tunez.UI.AlbumFormPage do
+      define :initialize_album_tracks, action: :initialize_tracks, args: [:tracks]
+    end
+
     resource Tunez.UI.ArtistFormPage
     resource Tunez.UI.ArtistIndexPage
     resource Tunez.UI.ArtistShowPage
@@ -16,5 +19,6 @@ defmodule Tunez.UI do
 
     resource Tunez.UI.NotificationsPage
     resource Tunez.UI.AppShell
+    resource Tunez.UI.PageHeader
   end
 end

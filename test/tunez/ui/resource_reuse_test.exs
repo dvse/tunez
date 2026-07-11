@@ -83,15 +83,40 @@ defmodule Tunez.UI.ResourceReuseTest do
         Path.join(project, "lib/tunez/ui.ex") | Path.wildcard("#{project}/lib/tunez/ui/*.ex")
       ])
 
-    upstream_lines =
+    upstream_live_view_lines =
       line_count.(
         Path.wildcard("#{upstream}/lib/tunez_web/live/*.ex") ++
           Path.wildcard("#{upstream}/lib/tunez_web/live/**/*.ex") ++
           [
+            Path.join(upstream, "lib/tunez_web/live_user_auth.ex"),
             Path.join(upstream, "lib/tunez_web/components/core_components.ex"),
-            Path.join(upstream, "lib/tunez_web/components/layouts.ex")
+            Path.join(upstream, "lib/tunez_web/components/layouts.ex"),
+            Path.join(upstream, "lib/tunez_web/components/layouts/root.html.heex")
           ]
       )
+
+    router_lines =
+      upstream
+      |> Path.join("lib/tunez_web/router.ex")
+      |> File.read!()
+      |> String.split("\n")
+
+    lines_between = fn from, until ->
+      router_lines
+      |> Enum.drop_while(&(not String.contains?(&1, from)))
+      |> Enum.take_while(&(not String.contains?(&1, until)))
+      |> length()
+    end
+
+    # Blueprint resources own the route/session/relation graph that LiveView
+    # leaves in its host router. Count only that upstream UI host surface, not
+    # the unrelated API, GraphQL, authentication-screen, or dev routes.
+    upstream_router_ui_lines =
+      Enum.find_index(router_lines, &String.contains?(&1, "pipeline :graphql do")) +
+        lines_between.("pipeline :browser do", "pipeline :api do") +
+        lines_between.("scope \"/\", TunezWeb do", "scope \"/gql\" do")
+
+    upstream_lines = upstream_live_view_lines + upstream_router_ui_lines
 
     assert blueprint_lines * 5 <= upstream_lines * 6,
            "Ash UI is #{blueprint_lines} LoC; 1.2x chapter-10 is #{div(upstream_lines * 6, 5)}"

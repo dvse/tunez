@@ -27,9 +27,6 @@ defmodule Tunez.UI.CoverImage do
   end
 
   actions do
-    create :create do
-      primary? true
-      accept [:image]
-    end
+    defaults create: :*
   end
 end

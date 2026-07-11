@@ -1,6 +1,5 @@
 defmodule Tunez.UI.ArtistFormPage do
   use Ash.Resource,
-    otp_app: :tunez,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
     extensions: [AshBlueprint],
@@ -36,8 +35,8 @@ defmodule Tunez.UI.ArtistFormPage do
   end
 
   attributes do
-    uuid_primary_key :id
-    attribute :session_id, :uuid, allow_nil?: false, public?: false
+    attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
+    attribute :subject_id, :string, allow_nil?: false, primary_key?: true, public?: false
     attribute :artist_id, :uuid, public?: true
     attribute :name, :string, constraints: [allow_empty?: true]
     attribute :biography, :string, constraints: [allow_empty?: true]
@@ -45,6 +44,14 @@ defmodule Tunez.UI.ArtistFormPage do
   end
 
   relationships do
+    has_one :app_shell, Tunez.UI.AppShell,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
+
+    has_many :page_headers, Tunez.UI.PageHeader,
+      source_attribute: :session_id,
+      destination_attribute: :session_id
+
     has_one :artist, Tunez.Music.Artist do
       source_attribute :artist_id
       destination_attribute :id
@@ -52,6 +59,11 @@ defmodule Tunez.UI.ArtistFormPage do
   end
 
   calculations do
+    calculate :page_title,
+              :string,
+              expr(if(is_nil(artist_id), do: "New Artist", else: "Update Artist")),
+              public?: true
+
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -117,9 +129,7 @@ defmodule Tunez.UI.ArtistFormPage do
   end
 
   identities do
-    identity :session_instance, [:session_id, :artist_id],
-      nils_distinct?: false,
-      pre_check_with: Tunez.UI
+    identity :session_instance, [:session_id, :subject_id], pre_check_with: Tunez.UI
   end
 
   actions do
@@ -129,6 +139,12 @@ defmodule Tunez.UI.ArtistFormPage do
       argument :artist_id, :uuid
       change AshBlueprint.Changes.SetSessionId
       change set_attribute(:artist_id, arg(:artist_id))
+
+      change fn changeset, _context ->
+        subject_id = Ash.Changeset.get_argument(changeset, :artist_id) || "new"
+        Ash.Changeset.change_attribute(changeset, :subject_id, subject_id)
+      end
+
       change set_attribute(:saved_artist_id, nil)
       change load(:artist)
     end
@@ -139,8 +155,6 @@ defmodule Tunez.UI.ArtistFormPage do
 
     update :save do
       require_atomic? false
-      argument :name, :string, constraints: [allow_empty?: true]
-      argument :biography, :string, constraints: [allow_empty?: true]
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
@@ -148,12 +162,8 @@ defmodule Tunez.UI.ArtistFormPage do
           session_id = data.session_id
 
           input = %{
-            name:
-              Ash.Changeset.get_argument(changeset, :name) || data.name ||
-                (data.artist && data.artist.name),
-            biography:
-              Ash.Changeset.get_argument(changeset, :biography) || data.biography ||
-                (data.artist && data.artist.biography)
+            name: data.name || (data.artist && data.artist.name),
+            biography: data.biography || (data.artist && data.artist.biography)
           }
 
           result =

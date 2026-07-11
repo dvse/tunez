@@ -55,6 +55,7 @@ defmodule Tunez.Accounts do
       define :notifications_for_user, action: :for_user
       define :get_notification_by_id, action: :for_user, get_by: :id
       define :dismiss_notification, action: :destroy
+      define :notify_album_followers, action: :notify_album_followers, args: [:album]
     end
   end
 end

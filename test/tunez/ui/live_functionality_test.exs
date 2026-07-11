@@ -8,11 +8,11 @@ defmodule Tunez.UI.LiveFunctionalityTest do
       conn
       |> visit(~p"/?limit=1")
       |> assert_has("[data-role=artist-card]", count: 1)
-      |> click_button("Next »")
+      |> click_link("Next »")
       |> assert_has("[data-role=artist-card]", count: 1)
-      |> click_button("Next »")
+      |> click_link("Next »")
       |> assert_has("[data-role=artist-card]", count: 1)
-      |> assert_has("button[disabled]", text: "Next »")
+      |> assert_has("a[disabled]", text: "Next »")
     end
 
     test "results can be reordered through the native select change event", %{conn: conn} do

@@ -1,6 +1,5 @@
 defmodule Tunez.UI.FlashStack do
   use Ash.Resource,
-    otp_app: :tunez,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
     extensions: [AshBlueprint],
@@ -17,8 +16,7 @@ defmodule Tunez.UI.FlashStack do
   end
 
   attributes do
-    uuid_primary_key :id
-    attribute :session_id, :uuid, allow_nil?: false, public?: true
+    attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: true
     attribute :info, :string, public?: true
     attribute :error, :string, public?: true
     attribute :warning, :string, public?: true
@@ -63,7 +61,9 @@ defmodule Tunez.UI.FlashStack do
                             dom_id: flash.dom_id,
                             role: "alert",
                             hidden: flash.hidden?,
-                            data: [kind: flash.kind]
+                            data: [kind: flash.kind],
+                            on_click: :dismiss,
+                            action_input: %{kind: flash.kind}
                           ],
                           [
                             box(:flash_grid, [], [
@@ -87,9 +87,7 @@ defmodule Tunez.UI.FlashStack do
                                 :flash_close,
                                 [
                                   type: "button",
-                                  aria: [label: "close"],
-                                  on_click: :dismiss,
-                                  action_input: %{kind: flash.kind}
+                                  aria: [label: "close"]
                                 ],
                                 [inline(:flash_close_icon, [], [])]
                               )
@@ -119,7 +117,6 @@ defmodule Tunez.UI.FlashStack do
       argument :session_id, :uuid, allow_nil?: false
       argument :level, :atom, allow_nil?: false, constraints: [one_of: [:info, :error, :warning]]
       argument :message, :string, allow_nil?: false
-
       change set_attribute(:session_id, arg(:session_id))
 
       change fn changeset, _context ->

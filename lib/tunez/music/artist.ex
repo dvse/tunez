@@ -38,6 +38,94 @@ defmodule Tunez.Music.Artist do
     description "A person or group of people that makes and releases music."
   end
 
+  policies do
+    policy action(:create) do
+      authorize_if actor_attribute_equals(:role, :admin)
+    end
+
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    policy action(:update) do
+      authorize_if actor_attribute_equals(:role, :admin)
+      authorize_if actor_attribute_equals(:role, :editor)
+    end
+
+    policy action(:destroy) do
+      authorize_if actor_attribute_equals(:role, :admin)
+    end
+  end
+
+  attributes do
+    uuid_primary_key :id
+
+    attribute :name, :string do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :biography, :string do
+      public? true
+    end
+
+    attribute :previous_names, {:array, :string} do
+      default []
+      public? true
+    end
+
+    create_timestamp :inserted_at, public?: true
+    update_timestamp :updated_at, public?: true
+  end
+
+  relationships do
+    has_many :albums, Tunez.Music.Album do
+      sort year_released: :desc
+      public? true
+    end
+
+    has_many :follower_relationships, Tunez.Music.ArtistFollower
+
+    many_to_many :followers, Tunez.Accounts.User do
+      join_relationship :follower_relationships
+      destination_attribute_on_join_resource :follower_id
+    end
+
+    belongs_to :created_by, Tunez.Accounts.User
+    belongs_to :updated_by, Tunez.Accounts.User
+  end
+
+  calculations do
+    calculate :followed_by_me,
+              :boolean,
+              expr(exists(follower_relationships, follower_id == ^actor(:id))) do
+      public? true
+    end
+  end
+
+  aggregates do
+    count :album_count, :albums do
+      public? true
+    end
+
+    first :latest_album_year_released, :albums, :year_released do
+      public? true
+    end
+
+    first :cover_image_url, :albums, :cover_image_url do
+      public? true
+    end
+
+    count :follower_count, :follower_relationships do
+      public? true
+    end
+  end
+
+  changes do
+    change relate_actor(:created_by, allow_nil?: true), on: [:create]
+    change relate_actor(:updated_by, allow_nil?: true)
+  end
+
   actions do
     defaults [:read]
 
@@ -123,7 +211,19 @@ defmodule Tunez.Music.Artist do
     update :update do
       accept [:name, :biography]
       require_atomic? false
-      change Tunez.Music.Changes.UpdatePreviousNames
+
+      change atomic_update(
+               :previous_names,
+               expr(
+                 fragment(
+                   "array_remove(array_prepend(?, ?), ?)",
+                   name,
+                   previous_names,
+                   ^atomic_ref(:name)
+                 )
+               ),
+               cast_atomic?: false
+             )
     end
 
     destroy :destroy do
@@ -134,94 +234,6 @@ defmodule Tunez.Music.Artist do
                return_notifications?: true,
                after_action?: false
              )
-    end
-  end
-
-  policies do
-    policy action(:create) do
-      authorize_if actor_attribute_equals(:role, :admin)
-    end
-
-    policy action_type(:read) do
-      authorize_if always()
-    end
-
-    policy action(:update) do
-      authorize_if actor_attribute_equals(:role, :admin)
-      authorize_if actor_attribute_equals(:role, :editor)
-    end
-
-    policy action(:destroy) do
-      authorize_if actor_attribute_equals(:role, :admin)
-    end
-  end
-
-  changes do
-    change relate_actor(:created_by, allow_nil?: true), on: [:create]
-    change relate_actor(:updated_by, allow_nil?: true)
-  end
-
-  attributes do
-    uuid_primary_key :id
-
-    attribute :name, :string do
-      allow_nil? false
-      public? true
-    end
-
-    attribute :biography, :string do
-      public? true
-    end
-
-    attribute :previous_names, {:array, :string} do
-      default []
-      public? true
-    end
-
-    create_timestamp :inserted_at, public?: true
-    update_timestamp :updated_at, public?: true
-  end
-
-  relationships do
-    has_many :albums, Tunez.Music.Album do
-      sort year_released: :desc
-      public? true
-    end
-
-    has_many :follower_relationships, Tunez.Music.ArtistFollower
-
-    many_to_many :followers, Tunez.Accounts.User do
-      join_relationship :follower_relationships
-      destination_attribute_on_join_resource :follower_id
-    end
-
-    belongs_to :created_by, Tunez.Accounts.User
-    belongs_to :updated_by, Tunez.Accounts.User
-  end
-
-  calculations do
-    calculate :followed_by_me,
-              :boolean,
-              expr(exists(follower_relationships, follower_id == ^actor(:id))) do
-      public? true
-    end
-  end
-
-  aggregates do
-    count :album_count, :albums do
-      public? true
-    end
-
-    first :latest_album_year_released, :albums, :year_released do
-      public? true
-    end
-
-    first :cover_image_url, :albums, :cover_image_url do
-      public? true
-    end
-
-    count :follower_count, :follower_relationships do
-      public? true
     end
   end
 end

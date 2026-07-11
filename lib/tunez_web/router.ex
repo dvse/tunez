@@ -21,10 +21,27 @@ defmodule TunezWeb.Router do
     plug :load_from_session
   end
 
+  pipeline :datastar do
+    plug :fetch_session
+    plug AshBlueprint.Phoenix.EnsureSessionId
+    plug :load_from_session
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
     plug :load_from_bearer
     plug :set_actor, :user
+  end
+
+  scope "/ds" do
+    pipe_through :datastar
+
+    forward "/", AshBlueprint.Datastar.Bridge,
+      domains: [Tunez.UI],
+      session_id: {__MODULE__, :datastar_session_id, []},
+      actor: &__MODULE__.datastar_actor/1,
+      tenant: &__MODULE__.datastar_tenant/1,
+      context: &__MODULE__.datastar_context/1
   end
 
   scope "/" do
@@ -116,4 +133,13 @@ defmodule TunezWeb.Router do
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
   end
+
+  def datastar_session_id(conn),
+    do: Plug.Conn.get_session(conn, "ash_blueprint_session_id")
+
+  def datastar_actor(conn), do: conn.assigns[:current_user]
+
+  def datastar_tenant(conn), do: Ash.PlugHelpers.get_tenant(conn)
+
+  def datastar_context(conn), do: Ash.PlugHelpers.get_context(conn) || %{}
 end

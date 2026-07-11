@@ -18,9 +18,7 @@ defmodule Tunez.UI.FormControl do
 
     attribute :dom_id, :string, public?: true
     attribute :hidden_label?, :boolean, allow_nil?: false, default: false, public?: true
-
     attribute :control, AshBlueprint.Type.RenderTree, allow_nil?: false, public?: true
-
     attribute :error, :string, public?: true
   end
 
@@ -45,9 +43,6 @@ defmodule Tunez.UI.FormControl do
   end
 
   actions do
-    create :create do
-      primary? true
-      accept [:label, :dom_id, :hidden_label?, :control, :error]
-    end
+    defaults create: :*
   end
 end

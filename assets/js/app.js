@@ -19,6 +19,9 @@
 import "phoenix_html";
 // Establish Phoenix Socket and LiveView configuration.
 import topbar from "../vendor/topbar";
+import trackSort from "./track_sort";
+
+window.AshBlueprint?.registerRuntime(trackSort);
 
 // Show progress bar on live navigation and form submits
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });

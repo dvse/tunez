@@ -1,6 +1,5 @@
 defmodule Tunez.UI.NotificationsPage do
   use Ash.Resource,
-    otp_app: :tunez,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
     extensions: [AshBlueprint],
@@ -17,8 +16,7 @@ defmodule Tunez.UI.NotificationsPage do
   end
 
   attributes do
-    uuid_primary_key :id
-    attribute :session_id, :uuid, allow_nil?: false, public?: false
+    attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
     attribute :open?, :boolean, allow_nil?: false, default: false
   end
 
@@ -35,22 +33,25 @@ defmodule Tunez.UI.NotificationsPage do
               expr(
                 box(:notifications_container, [dom_id: "notifications_container"], [
                   box(:notifications_root, [], [
-                    box(:notifications_toggle, [on_click: :toggle], [
-                      inline(:notifications_bell_icon, [], []),
-                      if empty?(notifications) do
-                        nothing()
-                      else
-                        inline(:notifications_badge, [], [
-                          inline(:notifications_badge_ping, [], []),
-                          inline(:notifications_badge_dot, [], [])
-                        ])
-                      end
-                    ]),
+                    box(
+                      :notifications_toggle,
+                      [tabindex: 0, on_click: :toggle, on_click_away: :close],
+                      [
+                        inline(:notifications_bell_icon, [], []),
+                        if empty?(notifications) do
+                          nothing()
+                        else
+                          inline(:notifications_badge, [], [
+                            inline(:notifications_badge_ping, [], []),
+                            inline(:notifications_badge_dot, [], [])
+                          ])
+                        end
+                      ]
+                    ),
                     box(
                       :notifications_panel,
                       [
                         dom_id: "notifications",
-                        open: open?,
                         state: [open: open?]
                       ],
                       [
@@ -118,6 +119,10 @@ defmodule Tunez.UI.NotificationsPage do
 
     update :toggle do
       change atomic_update(:open?, expr(not open?))
+    end
+
+    update :close do
+      change set_attribute(:open?, false)
     end
 
     update :dismiss do

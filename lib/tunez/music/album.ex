@@ -25,42 +25,6 @@ defmodule Tunez.Music.Album do
     end
   end
 
-  actions do
-    defaults [:read]
-
-    create :create do
-      accept [:name, :year_released, :cover_image_url, :artist_id]
-
-      argument :tracks, {:array, Tunez.Music.TrackInput} do
-        allow_nil? true
-      end
-
-      change fn changeset, _context ->
-        manage_track_inputs(changeset)
-      end
-    end
-
-    update :update do
-      accept [:name, :year_released, :cover_image_url]
-      require_atomic? false
-
-      argument :tracks, {:array, Tunez.Music.TrackInput} do
-        allow_nil? true
-      end
-
-      change fn changeset, _context ->
-        manage_track_inputs(changeset)
-      end
-    end
-
-    destroy :destroy do
-      primary? true
-      require_atomic? false
-
-      change cascade_destroy(:notifications, return_notifications?: true, after_action?: false)
-    end
-  end
-
   policies do
     bypass actor_attribute_equals(:role, :admin) do
       authorize_if always()
@@ -70,6 +34,10 @@ defmodule Tunez.Music.Album do
       authorize_if actor_attribute_equals(:role, :editor)
     end
 
+    policy action(:manageable) do
+      authorize_if expr(^actor(:role) == :editor and created_by_id == ^actor(:id))
+    end
+
     policy action_type([:update, :destroy]) do
       authorize_if expr(can_manage_album?)
     end
@@ -77,26 +45,6 @@ defmodule Tunez.Music.Album do
     policy action_type(:read) do
       authorize_if always()
     end
-  end
-
-  changes do
-    change Tunez.Accounts.Changes.SendNewAlbumNotifications, on: [:create]
-
-    change relate_actor(:created_by, allow_nil?: true), on: [:create]
-    change relate_actor(:updated_by, allow_nil?: true)
-  end
-
-  validations do
-    validate numericality(:year_released,
-               greater_than: 1950,
-               less_than_or_equal_to: Date.utc_today().year + 1
-             ),
-             where: [present(:year_released)],
-             message: "must be between 1950 and next year"
-
-    validate match(:cover_image_url, ~r"^(https://|/images/).+(\.png|\.jpg)$"),
-      where: [changing(:cover_image_url)],
-      message: "must start with https:// or /images/"
   end
 
   attributes do
@@ -137,8 +85,6 @@ defmodule Tunez.Music.Album do
   end
 
   calculations do
-    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes
-
     calculate :can_manage_album?,
               :boolean,
               expr(
@@ -148,12 +94,82 @@ defmodule Tunez.Music.Album do
   end
 
   aggregates do
-    sum :duration_seconds, :tracks, :duration_seconds
+    sum :duration_seconds, :tracks, :duration_seconds do
+      public? true
+    end
   end
 
   identities do
     identity :unique_album_names_per_artist, [:name, :artist_id],
       message: "already exists for this artist"
+  end
+
+  changes do
+    change relate_actor(:created_by, allow_nil?: true), on: [:create]
+    change relate_actor(:updated_by, allow_nil?: true)
+  end
+
+  validations do
+    validate numericality(:year_released,
+               greater_than: 1950,
+               less_than_or_equal_to: Date.utc_today().year + 1
+             ),
+             where: [present(:year_released)],
+             message: "must be between 1950 and next year"
+
+    validate match(:cover_image_url, ~r"^(https://|/images/).+(\.png|\.jpg)$"),
+      where: [changing(:cover_image_url)],
+      message: "must start with https:// or /images/"
+  end
+
+  actions do
+    defaults [:read]
+
+    read :manageable do
+      public? false
+      prepare build(load: [:tracks])
+    end
+
+    create :create do
+      accept [:name, :year_released, :cover_image_url, :artist_id]
+
+      argument :tracks, {:array, Tunez.Music.TrackInput} do
+        allow_nil? true
+      end
+
+      change fn changeset, _context ->
+        manage_track_inputs(changeset)
+      end
+
+      change fn changeset, context ->
+        Ash.Changeset.after_action(changeset, fn _changeset, album ->
+          case Tunez.Accounts.notify_album_followers(album, scope: context) do
+            :ok -> {:ok, album}
+            {:error, error} -> {:error, error}
+          end
+        end)
+      end
+    end
+
+    update :update do
+      accept [:name, :year_released, :cover_image_url]
+      require_atomic? false
+
+      argument :tracks, {:array, Tunez.Music.TrackInput} do
+        allow_nil? true
+      end
+
+      change fn changeset, _context ->
+        manage_track_inputs(changeset)
+      end
+    end
+
+    destroy :destroy do
+      primary? true
+      require_atomic? false
+
+      change cascade_destroy(:notifications, return_notifications?: true, after_action?: false)
+    end
   end
 
   defp manage_track_inputs(changeset) do
