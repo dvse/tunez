@@ -201,37 +201,25 @@ defmodule Tunez.UI.ArtistIndexPage do
                     ]),
                     if not is_nil(next_artist) or offset > 0 do
                       box(:pagination, [], [
-                        link(
+                        button(
                           :primary_link_inverse,
                           [
-                            to:
-                              "/?sort_by=" <>
-                                to_string(sort_by) <>
-                                if(q == "", do: "", else: "&q=" <> q) <>
-                                "&limit=" <>
-                                to_string(limit) <>
-                                "&offset=" <>
-                                to_string(if(offset > limit, do: offset - limit, else: 0)),
+                            type: :button,
+                            on_click: :previous_page,
                             data: [role: "previous-page"],
                             disabled: offset == 0
                           ],
-                          [text("« Previous")]
+                          [text("\u00ab Previous")]
                         ),
-                        link(
+                        button(
                           :primary_link_inverse,
                           [
-                            to:
-                              "/?sort_by=" <>
-                                to_string(sort_by) <>
-                                if(q == "", do: "", else: "&q=" <> q) <>
-                                "&limit=" <>
-                                to_string(limit) <>
-                                "&offset=" <>
-                                to_string(offset + limit),
+                            type: :button,
+                            on_click: :next_page,
                             data: [role: "next-page"],
                             disabled: is_nil(next_artist)
                           ],
-                          [text("Next »")]
+                          [text("Next \u00bb")]
                         )
                       ])
                     else
@@ -280,6 +268,24 @@ defmodule Tunez.UI.ArtistIndexPage do
     update :change_sort do
       accept [:sort_by]
       change set_attribute(:offset, 0)
+    end
+
+    update :previous_page do
+      require_atomic? false
+
+      change fn changeset, _context ->
+        data = changeset.data
+        Ash.Changeset.change_attribute(changeset, :offset, max(data.offset - data.limit, 0))
+      end
+    end
+
+    update :next_page do
+      require_atomic? false
+
+      change fn changeset, _context ->
+        data = changeset.data
+        Ash.Changeset.change_attribute(changeset, :offset, data.offset + data.limit)
+      end
     end
   end
 

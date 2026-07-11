@@ -426,8 +426,20 @@ defmodule Tunez.HTMLParity do
     cond do
       tag == "input" and Enum.member?(attrs, {"type", "hidden"}) -> nil
       tag == "label" and phoenix_form_label_noise?(attrs, children) -> nil
+      pagination_control?(attrs) -> normalize_element({"button", pagination_attrs(attrs), children})
       true -> normalize_element({tag, attrs, children})
     end
+  end
+
+  # URL-link paging (upstream) and action paging (blueprint) are the same
+  # control: both project offset/limit into the URL. Canonicalize to a
+  # button and drop the transport-specific href/type.
+  defp pagination_control?(attrs) do
+    Enum.any?(attrs, fn {k, v} -> k == "data-role" and v in ["previous-page", "next-page"] end)
+  end
+
+  defp pagination_attrs(attrs) do
+    Enum.reject(attrs, fn {k, _v} -> k in ["href", "type"] end)
   end
 
   defp normalize_node(text) when is_binary(text) do
