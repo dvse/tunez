@@ -10,7 +10,14 @@ defmodule Tunez.UI.ArtistIndexPage do
     private? false
   end
 
-  route("/", query: [:q, :sort_by, :limit, :offset])
+  routes do
+    route "/" do
+      query :q, :string
+      query :sort_by, :atom
+      query :limit, :integer
+      query :offset, :integer
+    end
+  end
 
   policies do
     policy always() do
@@ -20,7 +27,6 @@ defmodule Tunez.UI.ArtistIndexPage do
 
   attributes do
     uuid_primary_key :id
-
     attribute :session_id, :uuid, allow_nil?: false, public?: false
 
     attribute :q, :string,
@@ -270,21 +276,7 @@ defmodule Tunez.UI.ArtistIndexPage do
     end
 
     update :change_sort do
-      argument :sort_by, :atom do
-        allow_nil? false
-
-        constraints one_of: [
-                      :"-updated_at",
-                      :"-inserted_at",
-                      :name,
-                      :"-album_count",
-                      :"--latest_album_year_released",
-                      :"-follower_count",
-                      :"-followed_by_me"
-                    ]
-      end
-
-      change set_attribute(:sort_by, arg(:sort_by))
+      accept [:sort_by]
       change set_attribute(:offset, 0)
     end
   end

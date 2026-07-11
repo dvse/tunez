@@ -163,6 +163,7 @@ defmodule TunezWeb.Music.AlbumTest do
         Ash.Generator.action_input(Tunez.Music.Album, :create,
           artist_id: artist.id,
           year_released: 2025,
+          tracks: [],
           cover_image_url: url
         )
         |> Enum.at(0)

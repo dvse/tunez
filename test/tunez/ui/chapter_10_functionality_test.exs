@@ -230,6 +230,25 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
              ]
     end
 
+    test "invalid new album data stays on the form with field errors", %{conn: conn} do
+      artist = generate(artist())
+
+      conn
+      |> insert_and_authenticate_user(:admin)
+      |> visit(~p"/artists/#{artist.id}/albums/new")
+      |> change_field("#album_form_name", "Incomplete Album")
+      |> click_button("Save")
+      |> assert_has(~s(#album_form_year_released[aria-invalid="true"]))
+      |> assert_has(~s(#album_form_year_released[data-blueprint-error]))
+      |> assert_has(~s([part="field_error"]), text: "is required")
+      |> assert_has(~s([part="flash_message"][data-kind="error"]),
+        text: "Could not save album data"
+      )
+      |> assert_path("/artists/#{artist.id}/albums/new")
+
+      refute get_by_name(Tunez.Music.Album, "Incomplete Album")
+    end
+
     test "admin updates an album and invalid changes leave it unchanged", %{conn: conn} do
       album =
         generate(
@@ -316,8 +335,8 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
         |> assert_has("[part=user_menu]")
         |> click_selector("[part=avatar_toggle]")
 
-      assert Enum.any?(Ash.read!(Tunez.UI.Navigation, authorize?: false), fn navigation ->
-               navigation.email == to_string(user.email) and navigation.menu_open?
+      assert Enum.any?(Ash.read!(Tunez.UI.AppShell, authorize?: false), fn shell ->
+               shell.email == to_string(user.email) and shell.menu_open?
              end)
 
       assert_has(session, "[part=user_menu][aria-expanded=true]")

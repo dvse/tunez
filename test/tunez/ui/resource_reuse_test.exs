@@ -13,7 +13,6 @@ defmodule Tunez.UI.ResourceReuseTest do
                         Tunez.UI.AppShell,
                         Tunez.UI.ArtistCard,
                         Tunez.UI.FormControl,
-                        Tunez.UI.Navigation,
                         Tunez.UI.NotificationsPage,
                         Tunez.UI.PageHeader
                       ]
@@ -31,9 +30,6 @@ defmodule Tunez.UI.ResourceReuseTest do
       end)
 
     assert Map.fetch!(parents_by_child, Tunez.UI.AppShell) == MapSet.new(@pages)
-
-    assert Map.fetch!(parents_by_child, Tunez.UI.Navigation) ==
-             MapSet.new([Tunez.UI.AppShell])
 
     assert Map.fetch!(parents_by_child, Tunez.UI.FlashStack) ==
              MapSet.new([Tunez.UI.AppShell])
@@ -58,7 +54,7 @@ defmodule Tunez.UI.ResourceReuseTest do
              MapSet.new([Tunez.UI.ArtistIndexPage])
 
     assert Map.fetch!(parents_by_child, Tunez.UI.NotificationsPage) ==
-             MapSet.new([Tunez.UI.Navigation])
+             MapSet.new([Tunez.UI.AppShell])
   end
 
   test "authored UI has no slot, fill, or outlet boundary" do

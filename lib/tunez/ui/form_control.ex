@@ -19,12 +19,9 @@ defmodule Tunez.UI.FormControl do
     attribute :dom_id, :string, public?: true
     attribute :hidden_label?, :boolean, allow_nil?: false, default: false, public?: true
 
-    attribute :control, AshBlueprint.Type.RenderTree do
-      allow_nil? false
-      public? true
-    end
+    attribute :control, AshBlueprint.Type.RenderTree, allow_nil?: false, public?: true
 
-    attribute :error, AshBlueprint.Type.RenderTree, public?: true
+    attribute :error, :string, public?: true
   end
 
   calculations do
@@ -38,10 +35,10 @@ defmodule Tunez.UI.FormControl do
                     label(:field_label, [for: dom_id], [text(label)])
                   end,
                   control,
-                  if is_nil(error) do
+                  if is_nil(error) or error == "" do
                     nothing()
                   else
-                    paragraph(:field_error, [role: "alert"], [error])
+                    paragraph(:field_error, [], [inline(:field_error_icon, [], []), text(error)])
                   end
                 ])
               )

@@ -30,8 +30,6 @@ defmodule TunezWeb.Layouts do
         <.user_info current_user={@current_user} socket={@socket} />
       </div>
       <div class="px-4">
-        <.flash_group flash={@flash} />
-
         {render_slot(@inner_block)}
       </div>
     </div>

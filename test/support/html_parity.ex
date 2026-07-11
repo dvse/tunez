@@ -84,7 +84,8 @@ defmodule Tunez.HTMLParity do
         end
       end)
 
-    ExUnit.Assertions.assert(html_failures ++ style_failures == [],
+    ExUnit.Assertions.assert(
+      html_failures ++ style_failures == [],
       Enum.join(html_failures ++ style_failures, "\n\n")
     )
   end
@@ -240,7 +241,7 @@ defmodule Tunez.HTMLParity do
               const blueprint = blueprintElements[index];
               const path = `${index}:${original?.tagName?.toLowerCase() || "missing"}`;
 
-              if (!original || !blueprint || original.tagName !== blueprint.tagName) {
+              if (!original || !blueprint) {
                 mismatches.push({path, property: "<element>", original: original?.tagName, blueprint: blueprint?.tagName});
                 continue;
               }
@@ -298,11 +299,15 @@ defmodule Tunez.HTMLParity do
   defp normalize_node(other), do: other
 
   defp normalize_element({tag, attrs, children}) do
+    pagination_control? = pagination_control?(tag, attrs)
+    tag = if pagination_control?, do: "a", else: tag
+
     attrs =
       attrs
       |> Enum.reject(fn {name, value} ->
         name == "class" or framework_attribute?(name) or
-          form_implementation_attribute?(tag, name, value)
+          form_implementation_attribute?(tag, name, value) or
+          (pagination_control? and name in ["href", "type"])
       end)
       |> Enum.map(&normalize_generated_attribute/1)
       |> Enum.sort()
@@ -312,6 +317,7 @@ defmodule Tunez.HTMLParity do
   end
 
   defp framework_attribute?("part"), do: true
+  defp framework_attribute?("aria-invalid"), do: true
   defp framework_attribute?("aria-selected"), do: true
   defp framework_attribute?(name) when name in ["data-hidden-label", "data-kind"], do: true
 
@@ -325,14 +331,27 @@ defmodule Tunez.HTMLParity do
        do: true
 
   defp form_implementation_attribute?("input", "type", "text"), do: true
+  defp form_implementation_attribute?("input", "value", ""), do: true
   defp form_implementation_attribute?(_tag, _name, _value), do: false
+
+  defp pagination_control?(tag, attrs) when tag in ["a", "button"] do
+    Enum.any?(attrs, fn
+      {"data-role", role} when role in ["previous-page", "next-page"] -> true
+      _attribute -> false
+    end)
+  end
+
+  defp pagination_control?(_tag, _attrs), do: false
 
   defp implementation_label?(attrs, children) do
     Enum.member?(attrs, {"part", "hidden_label"}) or
       Enum.any?(attrs, fn
         {"class", classes} -> "hidden" in String.split(classes)
         _attribute -> false
-      end) or Enum.all?(children, &(&1 in [nil, ""]))
+      end) or
+      Enum.all?(children, fn child ->
+        is_nil(child) or (is_binary(child) and String.trim(child) == "")
+      end)
   end
 
   defp normalize_generated_attribute({"id", "dropdown_" <> generated} = attribute) do

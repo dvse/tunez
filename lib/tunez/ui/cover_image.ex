@@ -18,10 +18,10 @@ defmodule Tunez.UI.CoverImage do
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
-                if is_nil(image) do
-                  box(:missing_cover, [], [inline(:missing_cover_icon, [], [])])
-                else
+                if image do
                   image(:cover_image, [src: image], [])
+                else
+                  box(:missing_cover, [], [inline(:missing_cover_icon, [], [])])
                 end
               )
   end

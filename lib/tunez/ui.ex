@@ -15,6 +15,6 @@ defmodule Tunez.UI do
     end
 
     resource Tunez.UI.NotificationsPage
-    resource Tunez.UI.Navigation
+    resource Tunez.UI.AppShell
   end
 end

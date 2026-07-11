@@ -10,14 +10,13 @@ defmodule Tunez.UI.ArtistShowPage do
     private? false
   end
 
-  route("/artists/:artist_id",
-    location:
-      expr(
-        if deleted? do
-          "/"
-        end
-      )
-  )
+  routes do
+    route "/artists/:artist_id" do
+      location(expr(if(deleted?, do: "/")))
+
+      param(:artist_id, :uuid)
+    end
+  end
 
   resource do
     description "Artist details, releases, tracks, following, and catalogue management."
@@ -68,6 +67,7 @@ defmodule Tunez.UI.ArtistShowPage do
                       title:
                         heading(:page_h1, [level: 1], [
                           text(artist.name),
+                          text(" "),
                           if is_nil(^actor(:id)) do
                             nothing()
                           else
@@ -121,7 +121,22 @@ defmodule Tunez.UI.ArtistShowPage do
                         end
                       ]
                     }),
-                    box(:biography, [], [text(coalesce(artist.biography, ""))]),
+                    box(:biography, [], [
+                      each(
+                        string_split(coalesce(artist.biography, ""), "\n"),
+                        :biography_line,
+                        [index: :biography_index],
+                        [
+                          text(biography_line),
+                          if index(:biography_index) <
+                               length(string_split(coalesce(artist.biography, ""), "\n")) - 1 do
+                            break(:biography_break, [], [])
+                          else
+                            nothing()
+                          end
+                        ]
+                      )
+                    ]),
                     if ^actor(:role) in [:admin, :editor] do
                       link(:primary_link, [to: "/artists/" <> artist_id <> "/albums/new"], [
                         text("New Album")
@@ -146,11 +161,12 @@ defmodule Tunez.UI.ArtistShowPage do
                                       album.name <>
                                         " (" <> to_string(album.year_released) <> ")"
                                     ),
+                                    text(" "),
                                     if is_nil(album.duration) do
                                       nothing()
                                     else
                                       inline(:album_duration, [], [
-                                        text(" (" <> album.duration <> ")")
+                                        text("(" <> album.duration <> ")")
                                       ])
                                     end
                                   ]),
@@ -221,7 +237,6 @@ defmodule Tunez.UI.ArtistShowPage do
       argument :artist_id, :uuid, allow_nil?: false
       change AshBlueprint.Changes.SetSessionId
       change set_attribute(:artist_id, arg(:artist_id))
-      # handoff state is mount-reset
       change set_attribute(:deleted?, false)
     end
 

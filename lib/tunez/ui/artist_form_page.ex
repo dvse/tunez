@@ -10,14 +10,15 @@ defmodule Tunez.UI.ArtistFormPage do
     private? false
   end
 
-  route("/artists/new",
-    location:
-      expr(
-        if not is_nil(saved_artist_id) do
-          "/artists/" <> saved_artist_id
-        end
-      )
-  )
+  routes do
+    route "/artists/new" do
+      location(expr(if(not is_nil(saved_artist_id), do: "/artists/" <> saved_artist_id)))
+    end
+
+    route "/artists/:artist_id/edit" do
+      param(:artist_id, :uuid)
+    end
+  end
 
   policies do
     bypass actor_attribute_equals(:role, :admin) do
@@ -82,12 +83,12 @@ defmodule Tunez.UI.ArtistFormPage do
                                 [
                                   dom_id: "artist_form_name",
                                   name: "name",
-                                  value: name,
+                                  value: coalesce(name, artist.name),
                                   on_input: :edit
                                 ],
                                 []
                               ),
-                            error: text(field_errors(:name))
+                            error: join(field_errors(:name), ", ")
                           }),
                           render(Tunez.UI.FormControl, %{
                             label: "Biography",
@@ -101,10 +102,10 @@ defmodule Tunez.UI.ArtistFormPage do
                                   on_input: :edit
                                 ],
                                 [
-                                  text(biography)
+                                  text(coalesce(biography, artist.biography))
                                 ]
                               ),
-                            error: text(field_errors(:biography))
+                            error: join(field_errors(:biography), ", ")
                           }),
                           box(:form_actions, [], [button(:form_button, [], [text("Save")])])
                         ])
@@ -128,76 +129,50 @@ defmodule Tunez.UI.ArtistFormPage do
       argument :artist_id, :uuid
       change AshBlueprint.Changes.SetSessionId
       change set_attribute(:artist_id, arg(:artist_id))
-      # handoff state is mount-reset: re-entry always gives a fresh form
       change set_attribute(:saved_artist_id, nil)
       change load(:artist)
-
-      # mount-seeded drafts: the form edits a snapshot of the artist
-      change fn changeset, context ->
-        Ash.Changeset.before_action(changeset, fn changeset ->
-          artist =
-            case Ash.Changeset.get_attribute(changeset, :artist_id) do
-              nil -> nil
-              artist_id -> Tunez.Music.get_artist_by_id!(artist_id, scope: context)
-            end
-
-          changeset
-          |> Ash.Changeset.force_change_attribute(:name, (artist && artist.name) || "")
-          |> Ash.Changeset.force_change_attribute(
-            :biography,
-            (artist && artist.biography) || ""
-          )
-        end)
-      end
     end
 
-    # ONE accept-style edit action: every field binds to it BY NAME —
-    # the targeted field arrives normalized, no per-field actions, no
-    # action_input plumbing
     update :edit do
       accept [:name, :biography]
     end
 
     update :save do
       require_atomic? false
-
-      # submit fields bind BY NAME; live per-field drafts back them up
       argument :name, :string, constraints: [allow_empty?: true]
       argument :biography, :string, constraints: [allow_empty?: true]
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
+          data = changeset.data
+          session_id = data.session_id
+
           input = %{
-            name: Ash.Changeset.get_argument(changeset, :name) || changeset.data.name,
+            name:
+              Ash.Changeset.get_argument(changeset, :name) || data.name ||
+                (data.artist && data.artist.name),
             biography:
-              Ash.Changeset.get_argument(changeset, :biography) || changeset.data.biography
+              Ash.Changeset.get_argument(changeset, :biography) || data.biography ||
+                (data.artist && data.artist.biography)
           }
 
           result =
-            if is_nil(changeset.data.artist_id) do
+            if is_nil(data.artist_id) do
               Tunez.Music.create_artist(input, scope: context)
             else
-              Tunez.Music.update_artist(changeset.data.artist, input, scope: context)
+              Tunez.Music.update_artist(data.artist, input, scope: context)
             end
 
           case result do
             {:ok, artist} ->
               {:ok, _flash} =
-                Tunez.UI.put_flash(
-                  changeset.data.session_id,
-                  :info,
-                  "Artist saved successfully",
-                  scope: context
-                )
+                Tunez.UI.put_flash(session_id, :info, "Artist saved successfully", scope: context)
 
               Ash.Changeset.force_change_attribute(changeset, :saved_artist_id, artist.id)
 
             {:error, error} ->
               {:ok, _flash} =
-                Tunez.UI.put_flash(
-                  changeset.data.session_id,
-                  :error,
-                  "Could not save artist data",
+                Tunez.UI.put_flash(session_id, :error, "Could not save artist data",
                   scope: context
                 )
 

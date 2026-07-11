@@ -28,3 +28,28 @@ action, calculation, bridge, or helper may read the catalogue directly.
 Cleanup condition: delete the manual relationship when stock Ash relationships
 can bind parent attributes to typed destination action arguments including
 dynamic sort/limit/offset across these data layers.
+
+## AppShell avatar seed
+
+`Tunez.UI.AppShell.mount` may use one action-local `change fn` to derive the
+lowercase SHA-256 avatar seed from its typed `:email` argument and write the
+concrete `:avatar_seed` attribute.
+
+Proof: the hash itself is expressible with stock Ash function fragments, but a
+lazy store child is previewed through
+`AshBlueprint.Runtime.ResourceComponentRender.build_store_prototype/3`, which
+calls only `Ash.Changeset.apply_attributes/1`. Ash keeps `atomic_set` values in
+`create_atomics` for the later data-layer create phase; `apply_attributes/1`
+does not evaluate them. `set_attribute` accepts a literal, argument template,
+or zero-arity function and does not evaluate an Ash expression; defaults cannot
+read sibling state; `update_change` installs a skipped `before_action` hook.
+Checked `ash_blueprint/lib/ash_blueprint/runtime/resource_component_render.ex`,
+Ash `changeset.ex`, `atomic_set.ex`, `set_attribute.ex`, `attribute.ex`,
+`update_change.ex`, and the ETS data-layer create evaluator. The callback is the
+smallest exception: it is inline in the owning Ash action, reads one typed
+argument, writes one modeled attribute, and creates no helper or alternate
+state path.
+
+Cleanup condition: replace the callback with `atomic_set` when Ash exposes a
+public changeset-preview API that evaluates create atomics without persisting,
+and AshBlueprint uses that API for lazy store prototypes.

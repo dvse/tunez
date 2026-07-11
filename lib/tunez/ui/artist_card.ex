@@ -42,6 +42,7 @@ defmodule Tunez.UI.ArtistCard do
                   if follower_count > 0 do
                     inline(:follower_count, [data: [role: "follower-count"]], [
                       inline(:follower_count_icon, [], []),
+                      text(" "),
                       text(to_string(follower_count))
                     ])
                   else

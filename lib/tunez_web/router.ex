@@ -15,7 +15,6 @@ defmodule TunezWeb.Router do
     plug :accepts, ["html"]
     plug :fetch_session
     plug AshBlueprint.Phoenix.EnsureSessionId
-    plug :fetch_live_flash
     plug :put_root_layout, html: {AshBlueprint.Phoenix.RootLayout, :render}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
@@ -37,26 +36,6 @@ defmodule TunezWeb.Router do
       ],
       session: {AshBlueprint.Phoenix.LiveSession, :generate_session, [:tunez]} do
       ash_blueprint_routes(domains: [Tunez.UI])
-
-      live "/artists/:artist_id/edit", Elixir.AshBlueprint.Phoenix.BridgeLive, :artist_form_edit,
-        private: %{
-          ash_blueprint_route_metadata:
-            AshBlueprint.Phoenix.RouteMetadata.new(
-              Tunez.UI.ArtistFormPage,
-              "/artists/:artist_id/edit",
-              []
-            )
-        }
-
-      live "/albums/:album_id/edit", Elixir.AshBlueprint.Phoenix.BridgeLive, :album_form_edit,
-        private: %{
-          ash_blueprint_route_metadata:
-            AshBlueprint.Phoenix.RouteMetadata.new(
-              Tunez.UI.AlbumFormPage,
-              "/albums/:album_id/edit",
-              []
-            )
-        }
     end
   end
 

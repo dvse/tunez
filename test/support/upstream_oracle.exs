@@ -24,16 +24,21 @@ defmodule Tunez.UpstreamOracle do
     admin = sign_in_admin!()
     artist_id = Enum.at(@artist_ids, 1)
 
-    screens = %{
-      "artist_index_empty" => render(build_conn(), "/?q=NO_PARITY_MATCH"),
-      "artist_index" =>
-        render(log_in(build_conn(), admin), "/?q=Parity&sort_by=name&limit=1&offset=1"),
-      "artist_show" => render(log_in(build_conn(), admin), "/artists/#{artist_id}"),
-      "artist_new" => render(log_in(build_conn(), admin), "/artists/new"),
-      "artist_edit" => render(log_in(build_conn(), admin), "/artists/#{artist_id}/edit"),
-      "album_new" => render(log_in(build_conn(), admin), "/artists/#{artist_id}/albums/new"),
-      "album_edit" => render(log_in(build_conn(), admin), "/albums/#{@album_id}/edit")
-    }
+    screens =
+      %{
+        "artist_index_empty" => render(build_conn(), "/?q=NO_PARITY_MATCH"),
+        "artist_index" =>
+          render(log_in(build_conn(), admin), "/?q=Parity&sort_by=name&limit=1&offset=1"),
+        "artist_show" => render(log_in(build_conn(), admin), "/artists/#{artist_id}"),
+        "artist_new" => render(log_in(build_conn(), admin), "/artists/new"),
+        "artist_edit" => render(log_in(build_conn(), admin), "/artists/#{artist_id}/edit"),
+        "album_new" => render(log_in(build_conn(), admin), "/artists/#{artist_id}/albums/new"),
+        "album_edit" => render(log_in(build_conn(), admin), "/albums/#{@album_id}/edit")
+      }
+      |> Map.merge(index_interaction_states(admin))
+      |> Map.merge(show_interaction_states(admin, artist_id))
+      |> Map.merge(artist_form_interaction_states(admin, artist_id))
+      |> Map.merge(album_form_interaction_states(admin, artist_id))
 
     IO.puts("ASH_BLUEPRINT_UPSTREAM_ORACLE=" <> Base.encode64(:erlang.term_to_binary(screens)))
   end
@@ -41,6 +46,95 @@ defmodule Tunez.UpstreamOracle do
   defp render(conn, path) do
     {:ok, view, _html} = live(conn, path)
     Phoenix.LiveViewTest.render(view)
+  end
+
+  defp mount(admin, path) do
+    {:ok, view, _html} = live(log_in(build_conn(), admin), path)
+    view
+  end
+
+  defp index_interaction_states(admin) do
+    sorted = mount(admin, "/?q=Parity&sort_by=name")
+    render_change(sorted, "change-sort", %{"sort_by" => "-album_count"})
+
+    searched = mount(admin, "/?sort_by=name")
+    render_submit(searched, "search", %{"query" => "Omega"})
+
+    %{
+      "artist_index_sorted" => Phoenix.LiveViewTest.render(sorted),
+      "artist_index_searched" => Phoenix.LiveViewTest.render(searched)
+    }
+  end
+
+  defp show_interaction_states(admin, artist_id) do
+    view = mount(admin, "/artists/#{artist_id}")
+    render_click(view, "unfollow", %{})
+    unfollowed = Phoenix.LiveViewTest.render(view)
+    render_click(view, "follow", %{})
+
+    %{
+      "artist_show_unfollowed" => unfollowed,
+      "artist_show_refollowed" => Phoenix.LiveViewTest.render(view)
+    }
+  end
+
+  defp artist_form_interaction_states(admin, artist_id) do
+    mid_edit = mount(admin, "/artists/#{artist_id}/edit")
+
+    render_change(mid_edit, "validate", %{
+      "form" => %{
+        "name" => "Parity M83 Draft",
+        "biography" => "Draft biography\nSecond draft line."
+      }
+    })
+
+    invalid = mount(admin, "/artists/#{artist_id}/edit")
+
+    render_submit(invalid, "save", %{
+      "form" => %{"name" => "", "biography" => "Draft biography"}
+    })
+
+    %{
+      "artist_edit_mid_edit" => Phoenix.LiveViewTest.render(mid_edit),
+      "artist_edit_error" => Phoenix.LiveViewTest.render(invalid)
+    }
+  end
+
+  defp album_form_interaction_states(admin, artist_id) do
+    mid_edit = mount(admin, "/artists/#{artist_id}/albums/new")
+    render_click(mid_edit, "add-track", %{})
+    render_click(mid_edit, "add-track", %{})
+
+    render_change(mid_edit, "validate", %{
+      "form" => %{
+        "name" => "Draft Album",
+        "year_released" => "2024",
+        "cover_image_url" => "/images/draft.jpg",
+        "tracks" => %{
+          "0" => %{"name" => "Draft One", "duration" => "2:22"},
+          "1" => %{"name" => "Draft Two", "duration" => "3:33"}
+        }
+      }
+    })
+
+    with_removed_track = Phoenix.LiveViewTest.render(mid_edit)
+    render_click(mid_edit, "remove-track", %{"path" => "form[tracks][1]"})
+
+    invalid = mount(admin, "/artists/#{artist_id}/albums/new")
+
+    render_submit(invalid, "save", %{
+      "form" => %{
+        "name" => "Incomplete Album",
+        "year_released" => "",
+        "cover_image_url" => ""
+      }
+    })
+
+    %{
+      "album_new_mid_edit" => with_removed_track,
+      "album_new_after_remove" => Phoenix.LiveViewTest.render(mid_edit),
+      "album_new_error" => Phoenix.LiveViewTest.render(invalid)
+    }
   end
 
   defp log_in(conn, user) do
