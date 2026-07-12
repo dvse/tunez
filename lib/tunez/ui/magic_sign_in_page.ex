@@ -9,10 +9,6 @@ defmodule Tunez.UI.MagicSignInPage do
     private? false
   end
 
-  ash_blueprint do
-    initial(:csrf_token, expr(context(:csrf_token)))
-  end
-
   routes do
     # Static query alias for the Datastar bridge; email links keep the path-token route below.
     route "/magic_link" do
@@ -92,9 +88,11 @@ defmodule Tunez.UI.MagicSignInPage do
     defaults [:read]
 
     create :mount do
+      change set_attribute(:csrf_token, context(:csrf_token))
       argument :token, :string, allow_nil?: false
       change set_attribute(:token, arg(:token))
       change AshBlueprint.Changes.SetSessionId
+      change Tunez.UI.Changes.BeginPageLife
     end
   end
 end

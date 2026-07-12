@@ -30,6 +30,7 @@ config :ash,
   transaction_rollback_on_error?: true,
   known_types: [AshPostgres.Timestamptz, AshPostgres.TimestamptzUsec],
   custom_expressions: [
+    AshBlueprint.Expressions.ToString,
     AshBlueprint.Expressions.Humanize,
     AshBlueprint.Expressions.RelativeTime,
     AshBlueprint.Expressions.TimeAgoInWords,

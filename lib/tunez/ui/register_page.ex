@@ -9,10 +9,6 @@ defmodule Tunez.UI.RegisterPage do
     private? false
   end
 
-  ash_blueprint do
-    initial(:csrf_token, expr(context(:csrf_token)))
-  end
-
   routes do
     route "/register"
   end
@@ -147,7 +143,9 @@ defmodule Tunez.UI.RegisterPage do
     defaults [:read]
 
     create :mount do
+      change set_attribute(:csrf_token, context(:csrf_token))
       change AshBlueprint.Changes.SetSessionId
+      change Tunez.UI.Changes.BeginPageLife
     end
 
     update :edit do

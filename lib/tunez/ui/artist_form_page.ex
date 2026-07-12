@@ -64,6 +64,12 @@ defmodule Tunez.UI.ArtistFormPage do
               expr(if(is_nil(artist_id), do: "New Artist", else: "Update Artist")),
               public?: true
 
+    # draft-over-authority overlay, declared once: nil draft = untouched
+    # (authority shows through), "" draft = deliberately cleared. The view
+    # renders these and save submits them — no seed copy, no input map scrape.
+    calculate :effective_name, :string, expr(name || artist.name), public?: true
+    calculate :effective_biography, :string, expr(biography || artist.biography), public?: true
+
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -95,7 +101,7 @@ defmodule Tunez.UI.ArtistFormPage do
                                 [
                                   dom_id: "artist_form_name",
                                   name: "name",
-                                  value: coalesce(name, artist.name),
+                                  value: effective_name,
                                   on_input: :edit
                                 ],
                                 []
@@ -114,7 +120,7 @@ defmodule Tunez.UI.ArtistFormPage do
                                   on_input: :edit
                                 ],
                                 [
-                                  text(coalesce(biography, artist.biography))
+                                  text(effective_biography)
                                 ]
                               ),
                             error: join(field_errors(:biography), ", ")
@@ -136,8 +142,15 @@ defmodule Tunez.UI.ArtistFormPage do
     defaults [:read]
 
     create :mount do
+      # remount of a live session must never stomp a mid-edit draft:
+      # on conflict only these fields update, drafts keep stored values
+      upsert? true
+      upsert_identity :session_instance
+      upsert_fields [:artist_id, :saved_artist_id]
+
       argument :artist_id, :uuid
       change AshBlueprint.Changes.SetSessionId
+      change Tunez.UI.Changes.BeginPageLife
       change set_attribute(:artist_id, arg(:artist_id))
 
       change fn changeset, _context ->
@@ -146,7 +159,6 @@ defmodule Tunez.UI.ArtistFormPage do
       end
 
       change set_attribute(:saved_artist_id, nil)
-      change load(:artist)
     end
 
     update :edit do
@@ -158,15 +170,14 @@ defmodule Tunez.UI.ArtistFormPage do
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
+          # the dispatch record arrives loaded per the view load contract:
+          # effective_* and artist are view state, not extra reads
           data = changeset.data
           session_id = data.session_id
 
-          # the SAVE-side mirror of the view's declared overlay
-          # (value: coalesce(draft, artist.field)) — one semantics, two
-          # readers, until expr-calcs load through ETS boundary reads
           input = %{
-            name: data.name || (data.artist && data.artist.name),
-            biography: data.biography || (data.artist && data.artist.biography)
+            name: data.effective_name,
+            biography: data.effective_biography
           }
 
           result =
@@ -179,17 +190,23 @@ defmodule Tunez.UI.ArtistFormPage do
           case result do
             {:ok, artist} ->
               {:ok, _flash} =
-                Tunez.UI.put_flash(session_id, :info, "Artist saved successfully", scope: context)
-
-              Ash.Changeset.force_change_attribute(changeset, :saved_artist_id, artist.id)
-
-            {:error, error} ->
-              {:ok, _flash} =
-                Tunez.UI.put_flash(session_id, :error, "Could not save artist data",
+                Tunez.UI.put_flash(session_id, :info, "Artist saved successfully", %{carry?: true},
                   scope: context
                 )
 
-              Ash.Changeset.add_error(changeset, error)
+              # consumption: the saved draft is spent; the overlay shows
+              # authority (including what was just saved) on the next visit
+              Ash.Changeset.force_change_attributes(changeset, %{
+                saved_artist_id: artist.id,
+                name: nil,
+                biography: nil
+              })
+
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not save artist data"),
+                error
+              ])
           end
         end)
       end

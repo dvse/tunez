@@ -239,6 +239,7 @@ defmodule Tunez.UI.ArtistIndexPage do
       accept [:q, :limit, :offset]
       argument :sort_by, :string
       change AshBlueprint.Changes.SetSessionId
+      change Tunez.UI.Changes.BeginPageLife
 
       change set_attribute(:sort_by, arg(:sort_by)),
         where: [
@@ -292,16 +293,11 @@ defmodule Tunez.UI.ArtistIndexPage do
          {limit, offset} =
            if mode == :next, do: {1, page.offset + page.limit}, else: {page.limit, page.offset}
 
-         # the UPSTREAM contract, untouched: paginated :search plus
-         # sort_input — paging/sorting are read options, not domain code
-         %{results: artists} =
-           Tunez.Music.search_artists!(
+         artists =
+           Tunez.Music.browse_artists!(
              page.q,
-             scope_opts ++
-               [
-                 page: [limit: limit, offset: offset],
-                 query: [sort_input: to_string(page.sort_by)]
-               ]
+             %{sort_by: to_string(page.sort_by), limit: limit, offset: offset},
+             scope_opts
            )
 
          if mode == :next, do: List.first(artists), else: artists

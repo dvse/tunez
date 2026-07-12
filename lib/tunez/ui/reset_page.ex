@@ -9,10 +9,6 @@ defmodule Tunez.UI.ResetPage do
     private? false
   end
 
-  ash_blueprint do
-    initial(:csrf_token, expr(context(:csrf_token)))
-  end
-
   routes do
     route "/reset"
 
@@ -188,9 +184,11 @@ defmodule Tunez.UI.ResetPage do
     defaults [:read]
 
     create :mount do
+      change set_attribute(:csrf_token, context(:csrf_token))
       argument :token, :string
       change set_attribute(:token, arg(:token))
       change AshBlueprint.Changes.SetSessionId
+      change Tunez.UI.Changes.BeginPageLife
     end
 
     update :edit do

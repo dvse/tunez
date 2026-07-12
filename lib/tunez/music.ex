@@ -47,6 +47,19 @@ defmodule Tunez.Music do
       define :create_artist, action: :create
       define :read_artists, action: :read
 
+      define :browse_artists,
+        action: :browse,
+        args: [:query],
+        default_options: [
+          load: [
+            :follower_count,
+            :followed_by_me,
+            :album_count,
+            :latest_album_year_released,
+            :cover_image_url
+          ]
+        ]
+
       define :search_artists,
         action: :search,
         args: [:query],
@@ -68,6 +81,7 @@ defmodule Tunez.Music do
     resource Tunez.Music.Album do
       define :create_album, action: :create
       define :get_album_by_id, action: :read, get_by: :id
+      define :get_manageable_album_by_id, action: :manageable, get_by: :id
       define :update_album, action: :update
       define :destroy_album, action: :destroy
     end

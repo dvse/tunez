@@ -38,42 +38,6 @@ defmodule Tunez.Music.Artist do
     description "A person or group of people that makes and releases music."
   end
 
-  actions do
-    defaults [:read]
-
-    read :search do
-      description "List Artists, optionally filtering by name."
-
-      argument :query, :ci_string do
-        description "Return only artists with names including the given value."
-        constraints allow_empty?: true
-        default ""
-      end
-
-      filter expr(contains(name, ^arg(:query)))
-
-      pagination offset?: true, default_limit: 12
-    end
-
-    create :create do
-      accept [:name, :biography]
-    end
-
-    update :update do
-      accept [:name, :biography]
-      change Tunez.Music.Changes.UpdatePreviousNames
-    end
-
-    destroy :destroy do
-      primary? true
-
-      change cascade_destroy(:albums,
-               return_notifications?: true,
-               after_action?: false
-             )
-    end
-  end
-
   policies do
     policy action(:create) do
       authorize_if actor_attribute_equals(:role, :admin)
@@ -91,11 +55,6 @@ defmodule Tunez.Music.Artist do
     policy action(:destroy) do
       authorize_if actor_attribute_equals(:role, :admin)
     end
-  end
-
-  changes do
-    change relate_actor(:created_by, allow_nil?: true), on: [:create]
-    change relate_actor(:updated_by, allow_nil?: true)
   end
 
   attributes do
@@ -153,10 +112,85 @@ defmodule Tunez.Music.Artist do
       public? true
     end
 
-    first :cover_image_url, :albums, :cover_image_url
+    first :cover_image_url, :albums, :cover_image_url do
+      public? true
+    end
 
     count :follower_count, :follower_relationships do
       public? true
+    end
+  end
+
+  changes do
+    change relate_actor(:created_by, allow_nil?: true), on: [:create]
+    change relate_actor(:updated_by, allow_nil?: true)
+  end
+
+  actions do
+    defaults [:read]
+
+    read :search do
+      description "List Artists, optionally filtering by name."
+
+      argument :query, :ci_string do
+        description "Return only artists with names including the given value."
+        constraints allow_empty?: true
+        default ""
+      end
+
+      filter expr(contains(name, ^arg(:query)))
+
+      pagination offset?: true, default_limit: 12
+    end
+
+    read :browse do
+      description "Catalogue window: name search, sort, and paging as one typed read."
+
+      argument :query, :ci_string do
+        constraints allow_empty?: true
+        default ""
+      end
+
+      argument :sort_by, :string do
+        default "name"
+      end
+
+      argument :limit, :integer do
+        default 12
+        constraints min: 1, max: 100
+      end
+
+      argument :offset, :integer do
+        default 0
+        constraints min: 0
+      end
+
+      filter expr(contains(name, ^arg(:query)))
+
+      prepare fn query, _context ->
+        query
+        |> Ash.Query.limit(Ash.Query.get_argument(query, :limit))
+        |> Ash.Query.offset(Ash.Query.get_argument(query, :offset))
+        |> Ash.Query.sort_input(Ash.Query.get_argument(query, :sort_by))
+      end
+    end
+
+    create :create do
+      accept [:name, :biography]
+    end
+
+    update :update do
+      accept [:name, :biography]
+      change Tunez.Music.Changes.UpdatePreviousNames
+    end
+
+    destroy :destroy do
+      primary? true
+
+      change cascade_destroy(:albums,
+               return_notifications?: true,
+               after_action?: false
+             )
     end
   end
 end

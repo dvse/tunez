@@ -206,17 +206,19 @@ defmodule Tunez.UI.ArtistShowPage do
                                 ])
                               else
                                 table(:track_table, [], [
-                                  each(album.tracks, :track, [key: track.id], [
-                                    row(:track_row, [], [
-                                      header_cell(:track_number, [], [
-                                        text(
-                                          if track.number < 10,
-                                            do: "0" <> to_string(track.number) <> ".",
-                                            else: to_string(track.number) <> "."
-                                        )
-                                      ]),
-                                      cell(:track_name, [], [text(track.name)]),
-                                      cell(:track_duration, [], [text(track.duration)])
+                                  table_body(:track_table_body, [], [
+                                    each(album.tracks, :track, [key: track.id], [
+                                      row(:track_row, [], [
+                                        header_cell(:track_number, [], [
+                                          text(
+                                            if track.number < 10,
+                                              do: "0" <> to_string(track.number) <> ".",
+                                              else: to_string(track.number) <> "."
+                                          )
+                                        ]),
+                                        cell(:track_name, [], [text(track.name)]),
+                                        cell(:track_duration, [], [text(track.duration)])
+                                      ])
                                     ])
                                   ])
                                 ])
@@ -241,6 +243,7 @@ defmodule Tunez.UI.ArtistShowPage do
     create :mount do
       argument :artist_id, :uuid, allow_nil?: false
       change AshBlueprint.Changes.SetSessionId
+      change Tunez.UI.Changes.BeginPageLife
       change set_attribute(:artist_id, arg(:artist_id))
       change set_attribute(:deleted?, false)
     end
@@ -251,8 +254,14 @@ defmodule Tunez.UI.ArtistShowPage do
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
           case Tunez.Music.follow_artist(changeset.data.artist, scope: context) do
-            {:ok, _follow} -> changeset
-            {:error, error} -> Ash.Changeset.add_error(changeset, error)
+            {:ok, _follow} ->
+              changeset
+
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not follow artist"),
+                error
+              ])
           end
         end)
       end
@@ -264,8 +273,14 @@ defmodule Tunez.UI.ArtistShowPage do
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
           case Tunez.Music.unfollow_artist(changeset.data.artist, scope: context) do
-            :ok -> changeset
-            {:error, error} -> Ash.Changeset.add_error(changeset, error)
+            :ok ->
+              changeset
+
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not unfollow artist"),
+                error
+              ])
           end
         end)
       end
@@ -293,7 +308,10 @@ defmodule Tunez.UI.ArtistShowPage do
               changeset
 
             {:error, error} ->
-              Ash.Changeset.add_error(changeset, error)
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not delete album"),
+                error
+              ])
           end
         end)
       end
@@ -311,13 +329,17 @@ defmodule Tunez.UI.ArtistShowPage do
                   changeset.data.session_id,
                   :info,
                   "Artist deleted successfully",
+                  %{carry?: true},
                   scope: context
                 )
 
               Ash.Changeset.force_change_attribute(changeset, :deleted?, true)
 
             {:error, error} ->
-              Ash.Changeset.add_error(changeset, error)
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not delete artist"),
+                error
+              ])
           end
         end)
       end

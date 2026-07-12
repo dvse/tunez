@@ -39,7 +39,7 @@ defmodule Tunez.UI.AlbumFormPage do
     attribute :name, :string, constraints: [allow_empty?: true]
     attribute :year_released, :string, constraints: [allow_empty?: true]
     attribute :cover_image_url, :string, constraints: [allow_empty?: true]
-    attribute :tracks, {:array, Tunez.UI.TrackDraft}, allow_nil?: false, default: []
+    attribute :tracks, {:array, Tunez.UI.AlbumTrackRow}, allow_nil?: false, default: []
   end
 
   relationships do
@@ -67,6 +67,21 @@ defmodule Tunez.UI.AlbumFormPage do
     calculate :page_title,
               :string,
               expr(if(is_nil(album_id), do: "New Album", else: "Update Album")),
+              public?: true
+
+    # draft-over-authority overlay, declared once: nil draft = untouched
+    # (authority shows through), "" draft = deliberately cleared. The view
+    # renders these and save submits them — no seed copy, no input map scrape.
+    calculate :effective_name, :string, expr(name || album.name), public?: true
+
+    calculate :effective_year_released,
+              :string,
+              expr(year_released || to_string(album.year_released)),
+              public?: true
+
+    calculate :effective_cover_image_url,
+              :string,
+              expr(cover_image_url || album.cover_image_url),
               public?: true
 
     calculate :view,
@@ -114,7 +129,7 @@ defmodule Tunez.UI.AlbumFormPage do
                                     [
                                       dom_id: "album_form_name",
                                       name: "name",
-                                      value: coalesce(name, album.name),
+                                      value: effective_name,
                                       on_input: :edit
                                     ],
                                     []
@@ -133,7 +148,7 @@ defmodule Tunez.UI.AlbumFormPage do
                                       type: :number,
                                       dom_id: "album_form_year_released",
                                       name: "year_released",
-                                      value: coalesce(year_released, album.year_released),
+                                      value: effective_year_released,
                                       on_input: :edit
                                     ],
                                     []
@@ -151,7 +166,7 @@ defmodule Tunez.UI.AlbumFormPage do
                                 [
                                   dom_id: "album_form_cover_image_url",
                                   name: "cover_image_url",
-                                  value: coalesce(cover_image_url, album.cover_image_url),
+                                  value: effective_cover_image_url,
                                   on_input: :edit
                                 ],
                                 []
@@ -171,10 +186,15 @@ defmodule Tunez.UI.AlbumFormPage do
                             ]),
                             table_body(
                               :track_editor_body,
-                              [dom_id: "trackSort", reorder: [action: :reorder_tracks]],
+                              [
+                                dom_id: "trackSort",
+                                client_driver: :track_sort,
+                                on_reorder: :reorder_tracks,
+                                action_input: %{order: event(:order)}
+                              ],
                               [
                                 each(tracks, :track, [key: track.id], [
-                                  render(Tunez.UI.TrackDraft, track)
+                                  render(Tunez.UI.AlbumTrackRow, track)
                                 ])
                               ]
                             )
@@ -201,10 +221,17 @@ defmodule Tunez.UI.AlbumFormPage do
     defaults [:read]
 
     create :mount do
+      # remount of a live session must never stomp a mid-edit draft:
+      # on conflict only these fields update, drafts keep stored values
+      upsert? true
+      upsert_identity :session_instance
+      upsert_fields [:artist_id, :album_id, :saved_artist_id]
+
       argument :artist_id, :uuid
       argument :album_id, :uuid
       validate present([:artist_id, :album_id], exactly: 1)
       change AshBlueprint.Changes.SetSessionId
+      change Tunez.UI.Changes.BeginPageLife
       change set_attribute(:artist_id, arg(:artist_id))
 
       change fn changeset, _context ->
@@ -225,34 +252,24 @@ defmodule Tunez.UI.AlbumFormPage do
       change set_attribute(:saved_artist_id, nil)
 
       change fn changeset, context ->
-        Ash.Changeset.after_action(changeset, fn _changeset, page ->
-          tracks = if is_struct(page.album, Tunez.Music.Album), do: page.album.tracks, else: []
+        case Ash.Changeset.get_argument(changeset, :album_id) do
+          nil ->
+            changeset
 
-          drafts =
-            tracks
-            |> Enum.with_index()
-            |> Enum.map(fn {track, position} ->
-              minutes = div(track.duration_seconds, 60)
+          album_id ->
+            # the one remaining copy: editable collection rows must be
+            # stored instances to be dispatch-addressable (nested UI model).
+            # Non-authoritative: on any failure the seed is skipped and the
+            # manage_relationship lookup owns the authorization outcome.
+            case Tunez.Music.get_manageable_album_by_id(album_id, load: [tracks: [:duration]], scope: context) do
+              {:ok, album} ->
+                Ash.Changeset.change_attribute(changeset, :tracks, track_rows(album.tracks))
 
-              seconds =
-                track.duration_seconds
-                |> rem(60)
-                |> Integer.to_string()
-                |> String.pad_leading(2, "0")
-
-              %{
-                track_id: track.id,
-                name: track.name,
-                duration: "#{minutes}:#{seconds}",
-                position: position
-              }
-            end)
-
-          Tunez.UI.initialize_album_tracks(page, drafts, scope: context)
-        end)
+              {:error, _not_manageable} ->
+                changeset
+            end
+        end
       end
-
-      change load([:artist, album: [:can_manage_album?]])
     end
 
     update :store_tracks do
@@ -271,11 +288,6 @@ defmodule Tunez.UI.AlbumFormPage do
           Ash.Changeset.force_change_attribute(changeset, :tracks, tracks)
         end)
       end
-    end
-
-    update :initialize_tracks do
-      accept [:tracks]
-      require_atomic? false
     end
 
     update :edit do
@@ -299,19 +311,32 @@ defmodule Tunez.UI.AlbumFormPage do
         allow_nil?: false,
         constraints: [items: [min: 0]]
 
-      change fn changeset, _context ->
-        tracks = changeset.data.tracks
+      validate fn changeset, _context ->
+        order = Ash.Changeset.get_argument(changeset, :order)
 
-        reordered =
-          changeset
-          |> Ash.Changeset.get_argument(:order)
-          |> Enum.map(&Enum.at(tracks, &1))
-          |> Enum.reject(&is_nil/1)
-          |> Enum.with_index()
-          |> Enum.map(fn {track, position} -> %{track | position: position} end)
+        expected = Enum.to_list(0..(length(changeset.data.tracks) - 1)//1)
 
-        Ash.Changeset.change_attribute(changeset, :tracks, reordered)
+        if is_list(order) and Enum.sort(order) == expected do
+          :ok
+        else
+          {:error,
+           field: :order, message: "must be an exact permutation of the current track indices"}
+        end
       end
+
+      change fn changeset, _context ->
+                tracks = changeset.data.tracks
+
+                reordered =
+                  changeset
+                  |> Ash.Changeset.get_argument(:order)
+                  |> Enum.map(&Enum.at(tracks, &1))
+                  |> Enum.with_index()
+                  |> Enum.map(fn {track, position} -> %{track | position: position} end)
+
+                Ash.Changeset.change_attribute(changeset, :tracks, reordered)
+              end,
+              only_when_valid?: true
     end
 
     update :save do
@@ -319,15 +344,16 @@ defmodule Tunez.UI.AlbumFormPage do
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->
+          # the dispatch record arrives loaded per the view load contract:
+          # effective_* and album are view state, not extra reads
           data = changeset.data
           session_id = data.session_id
 
-          cover_image_url =
-            data.cover_image_url || (data.album && data.album.cover_image_url) || ""
+          cover_image_url = data.effective_cover_image_url || ""
 
           input = %{
-            name: data.name || (data.album && data.album.name),
-            year_released: data.year_released || (data.album && data.album.year_released),
+            name: data.effective_name,
+            year_released: data.effective_year_released,
             cover_image_url: if(cover_image_url == "", do: nil, else: cover_image_url),
             tracks:
               Enum.with_index(data.tracks, fn track, order ->
@@ -344,26 +370,51 @@ defmodule Tunez.UI.AlbumFormPage do
             if is_nil(data.album_id) do
               Tunez.Music.create_album(Map.put(input, :artist_id, data.artist_id), scope: context)
             else
-              Tunez.Music.update_album(data.album, input, scope: context)
+              Tunez.Music.update_album(data.album, input, load: [tracks: [:duration]], scope: context)
             end
 
           case result do
             {:ok, album} ->
               {:ok, _flash} =
-                Tunez.UI.put_flash(session_id, :info, "Album saved successfully", scope: context)
-
-              Ash.Changeset.force_change_attribute(changeset, :saved_artist_id, album.artist_id)
-
-            {:error, error} ->
-              {:ok, _flash} =
-                Tunez.UI.put_flash(session_id, :error, "Could not save album data",
+                Tunez.UI.put_flash(session_id, :info, "Album saved successfully", %{carry?: true},
                   scope: context
                 )
 
-              Ash.Changeset.add_error(changeset, error)
+              # consumption: scalars fall back to authority via the overlay;
+              # edit-form tracks re-materialize from the SAVE RESULT (fresh
+              # track ids); a reopened NEW form starts pristine
+              saved_rows = if data.album_id, do: track_rows(album.tracks), else: []
+
+              Ash.Changeset.force_change_attributes(changeset, %{
+                saved_artist_id: album.artist_id,
+                name: nil,
+                year_released: nil,
+                cover_image_url: nil,
+                tracks: saved_rows
+              })
+
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not save album data"),
+                error
+              ])
           end
         end)
       end
+    end
+  end
+
+  # helper: track_rows/1 — multi-use: the one row shape for both copies the
+  # nested UI model requires (mount materialization + post-save re-materialization)
+  defp track_rows(tracks) do
+    case tracks do
+      tracks when is_list(tracks) ->
+        Enum.with_index(tracks, fn track, position ->
+          %{track_id: track.id, name: track.name, duration: track.duration, position: position}
+        end)
+
+      _not_loaded ->
+        []
     end
   end
 end

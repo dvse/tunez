@@ -174,6 +174,8 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
         visit(conn, ~p"/artists/#{album.artist_id}/albums/new")
       end
 
+      # Ordinary users are forbidden from the form itself; the not-found
+      # masking of unauthorized albums applies to editors (next test).
       assert_raise Ash.Error.Forbidden, fn -> visit(conn, ~p"/albums/#{album.id}/edit") end
     end
 
@@ -227,7 +229,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> assert_field_value("#album_form_tracks_1_duration", "3:33")
       |> assert_has("tr[data-id]", count: 3)
       |> change_field("#album_form_tracks_2_name", "Third Track")
-      |> click_link("tr[data-id='2'] a", "Delete")
+      |> click_selector("tr[data-id='2'] button[part=track_delete_link]")
       |> assert_has("tr[data-id]", count: 2)
       |> assert_field_value("#album_form_tracks_0_name", "First Track")
       |> assert_field_value("#album_form_tracks_1_name", "Second Track")
@@ -297,7 +299,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> assert_has("tr[data-id]", count: 3)
       |> change_field("#album_form_tracks_2_name", "Added Track")
       |> change_field("#album_form_tracks_2_duration", "5:55")
-      |> click_link("tr[data-id='1'] a", "Delete")
+      |> click_selector("tr[data-id='1'] button[part=track_delete_link]")
       |> assert_has("tr[data-id]", count: 2)
       |> assert_field_value("#album_form_tracks_0_name", "Edited Existing Track")
       |> assert_field_value("#album_form_tracks_1_name", "Added Track")
@@ -392,15 +394,15 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
     unwrap(session, fn view ->
       element = Phoenix.LiveViewTest.element(view, selector)
 
-      [name] =
+      [binding] =
         element
         |> Phoenix.LiveViewTest.render()
         |> Floki.parse_fragment!()
-        |> Floki.attribute("name")
+        |> Floki.attribute("data-blueprint-binding-input")
 
-      Phoenix.LiveViewTest.render_change(element, %{
-        "_target" => [name],
-        name => value
+      Phoenix.LiveViewTest.render_hook(view, "ash_blueprint:dispatch", %{
+        "binding" => binding,
+        "value" => value
       })
     end)
   end

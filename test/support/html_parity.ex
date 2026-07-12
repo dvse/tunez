@@ -321,8 +321,25 @@ defmodule Tunez.HTMLParity do
 
           function styles(element) {
             const computed = element.ownerDocument.defaultView.getComputedStyle(element);
+
+            function canonicalValue(name, value) {
+              if (name !== "text-align") return value;
+
+              if (computed.direction === "rtl") {
+                if (value === "start") return "right";
+                if (value === "end") return "left";
+              } else {
+                if (value === "start") return "left";
+                if (value === "end") return "right";
+              }
+
+              return value;
+            }
+
             return Object.fromEntries(
-              Array.from(computed).sort().map(name => [name, computed.getPropertyValue(name)])
+              Array.from(computed).sort().map(
+                name => [name, canonicalValue(name, computed.getPropertyValue(name))]
+              )
             );
           }
 
@@ -424,22 +441,21 @@ defmodule Tunez.HTMLParity do
 
   defp normalize_node({tag, attrs, children}) do
     cond do
-      tag == "input" and Enum.member?(attrs, {"type", "hidden"}) -> nil
-      tag == "label" and phoenix_form_label_noise?(attrs, children) -> nil
-      pagination_control?(attrs) -> normalize_element({"button", pagination_attrs(attrs), children})
-      true -> normalize_element({tag, attrs, children})
+      tag == "input" and Enum.member?(attrs, {"type", "hidden"}) ->
+        nil
+
+      tag == "label" and phoenix_form_label_noise?(attrs, children) ->
+        nil
+
+      pagination_control?(attrs) ->
+        normalize_element({"button", pagination_attrs(attrs), children})
+
+      delete_control?(tag, attrs, children) ->
+        normalize_element({"button", delete_control_attrs(attrs), children})
+
+      true ->
+        normalize_element({tag, attrs, children})
     end
-  end
-
-  # URL-link paging (upstream) and action paging (blueprint) are the same
-  # control: both project offset/limit into the URL. Canonicalize to a
-  # button and drop the transport-specific href/type.
-  defp pagination_control?(attrs) do
-    Enum.any?(attrs, fn {k, v} -> k == "data-role" and v in ["previous-page", "next-page"] end)
-  end
-
-  defp pagination_attrs(attrs) do
-    Enum.reject(attrs, fn {k, _v} -> k in ["href", "type"] end)
   end
 
   defp normalize_node(text) when is_binary(text) do
@@ -450,6 +466,42 @@ defmodule Tunez.HTMLParity do
   end
 
   defp normalize_node(other), do: other
+
+  # URL-link paging (upstream) and action paging (blueprint) are the same
+  # control: both project offset/limit into the URL. Canonicalize to a
+  # button and drop the transport-specific href/type.
+  defp pagination_control?(attrs) do
+    Enum.any?(attrs, fn {k, v} ->
+      k == "data-role" and v in ["previous-page", "next-page"]
+    end)
+  end
+
+  # The row delete control is an upstream anchor and a Blueprint button.
+  # Both retain the same hidden label and icon children; only the transport
+  # element and its href/type attributes need canonicalizing.
+  defp delete_control?("button", attrs, _children),
+    do: Enum.member?(attrs, {"part", "track_delete_link"})
+
+  defp delete_control?("a", attrs, children) do
+    Enum.member?(attrs, {"href", "#"}) and
+      Enum.any?(children, fn
+        {"span", _, kids} ->
+          Enum.any?(kids, &(is_binary(&1) and String.trim(&1) == "Delete"))
+
+        _other ->
+          false
+      end)
+  end
+
+  defp delete_control?(_tag, _attrs, _children), do: false
+
+  defp delete_control_attrs(attrs) do
+    Enum.reject(attrs, fn {name, _value} -> name in ["href", "type"] end)
+  end
+
+  defp pagination_attrs(attrs) do
+    Enum.reject(attrs, fn {k, _v} -> k in ["href", "type"] end)
+  end
 
   defp normalize_element({tag, attrs, children}) do
     notifications_toggle? = Enum.member?(attrs, {"part", "notifications_toggle"})
@@ -467,6 +519,8 @@ defmodule Tunez.HTMLParity do
       attrs
       |> Enum.reject(fn {name, value} ->
         name == "class" or framework_attribute?(name) or
+          datastar_generated_attribute?(name, value) or
+          accessibility_implementation_attribute?(tag, attrs, name) or
           form_implementation_attribute?(tag, name, value) or
           (notifications_toggle? and name == "tabindex") or
           (state_projection? and name in ["aria-expanded", "open"])
@@ -478,14 +532,50 @@ defmodule Tunez.HTMLParity do
     {tag, attrs, children}
   end
 
+  defp accessibility_implementation_attribute?(_tag, attrs, "role") do
+    Enum.member?(attrs, {"part", "field_error"})
+  end
+
+  # Blueprint distributes field errors ARIA-first (aria-invalid on the
+  # bound control); upstream renders only the error text element.
+  defp accessibility_implementation_attribute?(tag, _attrs, "aria-invalid")
+       when tag in ["input", "select", "textarea"],
+       do: true
+
+  # Blueprint projects declared states ARIA-first (aria-selected on the
+  # follow toggle); upstream signals the same state via classes only.
+  defp accessibility_implementation_attribute?(_tag, _attrs, "aria-selected"), do: true
+
+  defp accessibility_implementation_attribute?("button", attrs, "aria-label") do
+    Enum.member?(attrs, {"part", "track_delete_link"})
+  end
+
+  defp accessibility_implementation_attribute?("input", attrs, "aria-label") do
+    Enum.any?(attrs, fn
+      {"id", "album_form_tracks_" <> _rest} -> true
+      _attribute -> false
+    end)
+  end
+
+  defp accessibility_implementation_attribute?(_tag, _attrs, _name), do: false
+
   defp framework_attribute?("part"), do: true
-  defp framework_attribute?("aria-invalid"), do: true
-  defp framework_attribute?("aria-selected"), do: true
   defp framework_attribute?(name) when name in ["data-hidden-label", "data-kind"], do: true
 
   defp framework_attribute?(name) do
     Enum.any?(@framework_attribute_prefixes, &String.starts_with?(name, &1))
   end
+
+  defp datastar_generated_attribute?(name, _value)
+       when name in ["data-bind", "data-init"],
+       do: true
+
+  defp datastar_generated_attribute?("data-on-" <> _event, _value), do: true
+
+  defp datastar_generated_attribute?("id", "bp-" <> generated),
+    do: Regex.match?(~r/^[A-Za-z0-9_-]{16}$/, generated)
+
+  defp datastar_generated_attribute?(_name, _value), do: false
 
   defp form_implementation_attribute?(tag, name, _value)
        when tag in ["form", "input", "select", "textarea"] and
@@ -513,6 +603,36 @@ defmodule Tunez.HTMLParity do
       :error -> attribute
     end
   end
+
+  defp normalize_generated_attribute({name, value})
+       when name in [
+              "allowfullscreen",
+              "async",
+              "autofocus",
+              "autoplay",
+              "checked",
+              "controls",
+              "default",
+              "defer",
+              "disabled",
+              "formnovalidate",
+              "hidden",
+              "inert",
+              "ismap",
+              "itemscope",
+              "loop",
+              "multiple",
+              "muted",
+              "nomodule",
+              "novalidate",
+              "open",
+              "playsinline",
+              "readonly",
+              "required",
+              "reversed",
+              "selected"
+            ] and value != "false",
+       do: {name, ""}
 
   defp normalize_generated_attribute(attribute), do: attribute
 

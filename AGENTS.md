@@ -53,3 +53,24 @@ state path.
 Cleanup condition: replace the callback with `atomic_set` when Ash exposes a
 public changeset-preview API that evaluates create atomics without persisting,
 and AshBlueprint uses that API for lazy store prototypes.
+
+
+## Page-life clock
+
+`Tunez.UI.PageLife` is the session's navigation clock; every routed page's
+`:mount` declares `change Tunez.UI.Changes.BeginPageLife` (a reused change is
+justified: nine resources declare the identical lifecycle fact through the
+`Tunez.UI.begin_page_life/2` domain interface with full scope). Flash rows are
+stamped with the life they were put in; visibility is the pure comparison in
+`Tunez.UI.Flash.visible?`. Failure flashes are NOT rows: they are projections
+of the dispatch's fieldless errors (`errors()` in `Tunez.UI.FlashStack`),
+which gives them per-dispatch transience with zero lifecycle state.
+
+## Album track materialization
+
+`Tunez.UI.AlbumFormPage.mount` performs one domain-interface read
+(`Tunez.Music.get_manageable_album_by_id/2`) to materialize track draft rows.
+This is the collection-copy the nested UI model requires: dispatch-receiving
+embedded rows must be stored instances, so a `||` overlay cannot express an
+editable collection. The read is non-authoritative — on failure the seed is
+skipped and `manage_relationship`'s policy-checked lookup owns the outcome.
