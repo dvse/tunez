@@ -5,6 +5,23 @@ defmodule Tunez.UI.ArtistIndexPage do
     extensions: [AshBlueprint],
     authorizers: [Ash.Policy.Authorizer]
 
+  # The sort vocabulary — ONE source for the attribute constraint, the
+  # select options, and the mount whitelist. Values are upstream
+  # sort_input strings.
+  @sort_options [
+    {"recently updated", "-updated_at"},
+    {"recently added", "-inserted_at"},
+    {"name", "name"},
+    {"number of albums", "-album_count"},
+    {"latest album release", "--latest_album_year_released"},
+    {"popularity", "-follower_count"},
+    {"followed artists first", "-followed_by_me"}
+  ]
+
+  @sort_option_maps Enum.map(@sort_options, fn {label, value} ->
+                      %{label: label, value: value}
+                    end)
+
   ets do
     private? false
   end
@@ -38,15 +55,7 @@ defmodule Tunez.UI.ArtistIndexPage do
       default :"-updated_at"
       public? true
 
-      constraints one_of: [
-                    :"-updated_at",
-                    :"-inserted_at",
-                    :name,
-                    :"-album_count",
-                    :"--latest_album_year_released",
-                    :"-follower_count",
-                    :"-followed_by_me"
-                  ]
+      constraints one_of: Enum.map(@sort_options, fn {_label, value} -> String.to_atom(value) end)
     end
 
     attribute :limit, :integer,
@@ -112,18 +121,7 @@ defmodule Tunez.UI.ArtistIndexPage do
                                 [dom_id: "sort_by", name: "sort_by"],
                                 [
                                   each(
-                                    [
-                                      %{label: "recently updated", value: "-updated_at"},
-                                      %{label: "recently added", value: "-inserted_at"},
-                                      %{label: "name", value: "name"},
-                                      %{label: "number of albums", value: "-album_count"},
-                                      %{
-                                        label: "latest album release",
-                                        value: "--latest_album_year_released"
-                                      },
-                                      %{label: "popularity", value: "-follower_count"},
-                                      %{label: "followed artists first", value: "-followed_by_me"}
-                                    ],
+                                    @sort_option_maps,
                                     :sort_option,
                                     [key: sort_option.value],
                                     [
@@ -244,15 +242,7 @@ defmodule Tunez.UI.ArtistIndexPage do
 
       change set_attribute(:sort_by, arg(:sort_by)),
         where: [
-          argument_in(:sort_by, [
-            "-updated_at",
-            "-inserted_at",
-            "name",
-            "-album_count",
-            "--latest_album_year_released",
-            "-follower_count",
-            "-followed_by_me"
-          ])
+          argument_in(:sort_by, Enum.map(@sort_options, fn {_label, value} -> value end))
         ]
     end
 
