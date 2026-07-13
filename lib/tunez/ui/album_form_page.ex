@@ -254,13 +254,19 @@ defmodule Tunez.UI.AlbumFormPage do
       change set_attribute(:artist_id, arg(:artist_id))
 
       change fn changeset, _context ->
-        subject_id =
-          case Ash.Changeset.get_argument(changeset, :artist_id) do
-            nil -> "album:" <> Ash.Changeset.get_argument(changeset, :album_id)
-            artist_id -> "artist:" <> artist_id
-          end
+        case {
+          Ash.Changeset.get_argument(changeset, :artist_id),
+          Ash.Changeset.get_argument(changeset, :album_id)
+        } do
+          {artist_id, nil} when not is_nil(artist_id) ->
+            Ash.Changeset.change_attribute(changeset, :subject_id, "artist:" <> artist_id)
 
-        Ash.Changeset.change_attribute(changeset, :subject_id, subject_id)
+          {nil, album_id} when not is_nil(album_id) ->
+            Ash.Changeset.change_attribute(changeset, :subject_id, "album:" <> album_id)
+
+          _invalid_subject ->
+            changeset
+        end
       end
 
       change manage_relationship(:album_id, :album,
@@ -354,13 +360,22 @@ defmodule Tunez.UI.AlbumFormPage do
 
       change fn changeset, _context ->
                tracks = changeset.data.tracks
+               order = Ash.Changeset.get_argument(changeset, :order) || []
 
                reordered =
-                 changeset
-                 |> Ash.Changeset.get_argument(:order)
-                 |> Enum.map(&Enum.at(tracks, &1))
+                 order
                  |> Enum.with_index()
-                 |> Enum.map(fn {track, position} -> %{track | position: position} end)
+                 |> Enum.reduce([], fn
+                   {track_index, position}, reordered when is_integer(track_index) ->
+                     case Enum.fetch(tracks, track_index) do
+                       {:ok, track} -> [%{track | position: position} | reordered]
+                       :error -> reordered
+                     end
+
+                   _invalid_index, reordered ->
+                     reordered
+                 end)
+                 |> Enum.reverse()
 
                Ash.Changeset.change_attribute(changeset, :tracks, reordered)
              end,
