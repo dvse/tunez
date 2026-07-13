@@ -1,5 +1,7 @@
 defmodule Tunez.Music do
-  use Ash.Domain, otp_app: :tunez, extensions: [AshGraphql.Domain, AshJsonApi.Domain, AshPhoenix]
+  use Ash.Domain,
+    otp_app: :tunez,
+    extensions: [AshGraphql.Domain, AshJsonApi.Domain, AshPhoenix, AshLua.Domain, AshAi]
 
   graphql do
     queries do
@@ -40,6 +42,38 @@ defmodule Tunez.Music do
 
   forms do
     form :create_album, args: [:artist_id]
+  end
+
+  lua do
+    namespace "music.artist" do
+      action :read, Tunez.Music.Artist, :read
+      action :search, Tunez.Music.Artist, :search
+      action :browse, Tunez.Music.Artist, :browse
+      action :create, Tunez.Music.Artist, :create
+      action :update, Tunez.Music.Artist, :update
+      action :follow, Tunez.Music.Artist, :follow
+      action :unfollow, Tunez.Music.Artist, :unfollow
+      action :destroy, Tunez.Music.Artist, :destroy
+    end
+
+    namespace "music.album" do
+      action :read, Tunez.Music.Album, :read
+      action :create, Tunez.Music.Album, :create
+      action :update, Tunez.Music.Album, :update
+      action :upload_cover, Tunez.Music.Album, :upload_cover
+      action :destroy, Tunez.Music.Album, :destroy
+    end
+
+    namespace "music.track" do
+      action :read, Tunez.Music.Track, :read
+    end
+
+    namespace "music.artist_follower" do
+      action :read, Tunez.Music.ArtistFollower, :read
+      action :for_artist, Tunez.Music.ArtistFollower, :for_artist
+      action :create, Tunez.Music.ArtistFollower, :create
+      action :unfollow, Tunez.Music.ArtistFollower, :unfollow
+    end
   end
 
   resources do
@@ -83,6 +117,7 @@ defmodule Tunez.Music do
       define :get_album_by_id, action: :read, get_by: :id
       define :get_manageable_album_by_id, action: :manageable, get_by: :id
       define :update_album, action: :update
+      define :upload_album_cover, action: :upload_cover
       define :destroy_album, action: :destroy
     end
 

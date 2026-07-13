@@ -2,7 +2,7 @@ defmodule Tunez.UI.NotificationsPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -17,13 +17,14 @@ defmodule Tunez.UI.NotificationsPage do
 
   attributes do
     attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
-    attribute :open?, :boolean, allow_nil?: false, default: false
+    attribute :open?, :boolean, allow_nil?: false, default: false, public?: true
   end
 
   relationships do
     has_many :notifications, Tunez.Accounts.Notification do
       no_attributes? true
       read_action :for_user
+      public? true
     end
   end
 
@@ -113,6 +114,17 @@ defmodule Tunez.UI.NotificationsPage do
   actions do
     defaults [:read]
 
+    read :for_session do
+      description "Read notification-panel UI state for one browser session."
+
+      argument :session_id, :uuid do
+        allow_nil? false
+        public? true
+      end
+
+      filter expr(session_id == ^arg(:session_id))
+    end
+
     create :mount do
       change AshBlueprint.Changes.SetSessionId
     end
@@ -127,7 +139,7 @@ defmodule Tunez.UI.NotificationsPage do
 
     update :dismiss do
       require_atomic? false
-      argument :notification_id, :uuid, allow_nil?: false
+      argument :notification_id, :uuid, allow_nil?: false, public?: true
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->

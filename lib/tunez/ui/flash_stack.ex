@@ -2,7 +2,7 @@ defmodule Tunez.UI.FlashStack do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -26,6 +26,7 @@ defmodule Tunez.UI.FlashStack do
       source_attribute :session_id
       destination_attribute :session_id
       sort rank: :asc
+      public? true
     end
   end
 
@@ -148,6 +149,17 @@ defmodule Tunez.UI.FlashStack do
   actions do
     defaults [:read]
 
+    read :for_session do
+      description "Read visible flash-message state for one browser session."
+
+      argument :session_id, :uuid do
+        allow_nil? false
+        public? true
+      end
+
+      filter expr(session_id == ^arg(:session_id))
+    end
+
     create :mount do
       primary? true
       upsert? true
@@ -160,6 +172,7 @@ defmodule Tunez.UI.FlashStack do
 
       argument :kind, :atom,
         allow_nil?: false,
+        public?: true,
         constraints: [one_of: [:info, :error, :warning]]
 
       change fn changeset, context ->

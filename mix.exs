@@ -45,6 +45,7 @@ defmodule Tunez.MixProject do
       {:ash_json_api, "~> 1.0"},
       {:ash_phoenix, "~> 2.0"},
       {:ash_ai, "~> 0.7.2"},
+      {:ash_lua, path: "../ash_lua", override: true},
       {:ash_blueprint, path: "../ash_blueprint", override: true},
       {:ash_blueprint_datastar, path: "../ash_blueprint/packages/ash_blueprint_datastar"},
       {:ash_blueprint_phoenix, path: "../ash_blueprint/packages/ash_blueprint_phoenix"},

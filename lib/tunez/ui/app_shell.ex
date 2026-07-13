@@ -2,7 +2,7 @@ defmodule Tunez.UI.AppShell do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -29,19 +29,23 @@ defmodule Tunez.UI.AppShell do
       public?: true,
       constraints: [allow_empty?: true]
 
-    attribute :menu_open?, :boolean, allow_nil?: false, default: false
+    attribute :menu_open?, :boolean, allow_nil?: false, default: false, public?: true
     attribute :avatar_seed, :string, allow_nil?: false, default: ""
     attribute :content, AshBlueprint.Type.RenderTree, public?: true
   end
 
   relationships do
-    has_one :notifications_page, Tunez.UI.NotificationsPage,
-      source_attribute: :session_id,
-      destination_attribute: :session_id
+    has_one :notifications_page, Tunez.UI.NotificationsPage do
+      source_attribute :session_id
+      destination_attribute :session_id
+      public? true
+    end
 
-    has_one :flash_stack, Tunez.UI.FlashStack,
-      source_attribute: :session_id,
-      destination_attribute: :session_id
+    has_one :flash_stack, Tunez.UI.FlashStack do
+      source_attribute :session_id
+      destination_attribute :session_id
+      public? true
+    end
   end
 
   calculations do
@@ -125,6 +129,17 @@ defmodule Tunez.UI.AppShell do
 
   actions do
     defaults [:read]
+
+    read :for_session do
+      description "Read shared application-shell UI state for one browser session."
+
+      argument :session_id, :uuid do
+        allow_nil? false
+        public? true
+      end
+
+      filter expr(session_id == ^arg(:session_id))
+    end
 
     create :mount do
       accept [:signed_in?, :email]

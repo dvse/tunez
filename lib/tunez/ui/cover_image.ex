@@ -1,7 +1,8 @@
 defmodule Tunez.UI.CoverImage do
   use Ash.Resource,
+    domain: Tunez.UI,
     data_layer: :embedded,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   policies do

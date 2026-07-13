@@ -2,7 +2,7 @@ defmodule Tunez.UI.PageHeader do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -30,7 +30,7 @@ defmodule Tunez.UI.PageHeader do
     attribute :title, AshBlueprint.Type.RenderTree, allow_nil?: false, public?: true
     attribute :subtitle, AshBlueprint.Type.RenderTree, public?: true
     attribute :actions, AshBlueprint.Type.RenderTree, public?: true
-    attribute :menu_open?, :boolean, allow_nil?: false, default: false
+    attribute :menu_open?, :boolean, allow_nil?: false, default: false, public?: true
   end
 
   calculations do
@@ -80,6 +80,17 @@ defmodule Tunez.UI.PageHeader do
 
   actions do
     defaults [:read]
+
+    read :for_session do
+      description "Read page-header UI state for one browser session."
+
+      argument :session_id, :uuid do
+        allow_nil? false
+        public? true
+      end
+
+      filter expr(session_id == ^arg(:session_id))
+    end
 
     create :mount do
       accept [:kind, :menu_id, :title, :subtitle, :actions]

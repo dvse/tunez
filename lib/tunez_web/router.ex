@@ -34,11 +34,29 @@ defmodule TunezWeb.Router do
     plug :set_actor, :user
   end
 
+  pipeline :mcp do
+    plug :load_from_bearer
+    plug :set_actor, :user
+  end
+
+  scope "/mcp" do
+    pipe_through :mcp
+
+    forward "/", AshAi.Mcp.Router,
+      tools: [
+        :tunez_lua_docs,
+        :tunez_lua_eval
+      ],
+      otp_app: :tunez,
+      mcp_name: "Tunez"
+  end
+
   scope "/ds" do
     pipe_through :datastar
 
     forward "/", AshBlueprint.Datastar.Bridge,
       domains: [Tunez.UI],
+      document: {__MODULE__, :datastar_document},
       session_id: {__MODULE__, :datastar_session_id, []},
       actor: &__MODULE__.datastar_actor/1,
       tenant: &__MODULE__.datastar_tenant/1,
@@ -117,6 +135,35 @@ defmodule TunezWeb.Router do
   end
 
   def protect_datastar_forms(conn, _opts), do: conn
+
+  # The datastar document reuses the SAME shell as the LiveView pages —
+  # document parity by construction. Scripts: the app bundle plus the
+  # datastar runtime; never the LiveView runtime.
+  def datastar_document(%{content: content, record: record, script_path: script_path}) do
+    page_title =
+      case Map.get(record, :page_title) do
+        title when is_binary(title) ->
+          title
+
+        %Ash.NotLoaded{} ->
+          case Ash.load(record, :page_title, authorize?: false) do
+            {:ok, %{page_title: title}} when is_binary(title) -> title
+            _other -> nil
+          end
+
+        _other ->
+          nil
+      end
+
+    AshBlueprint.Phoenix.RootLayout.render(%{
+      inner_content: {:safe, content},
+      page_title: page_title,
+      root_layout_scripts: [
+        {script_path, "module"}
+        | Application.get_env(:tunez, :root_layout_application_scripts, [])
+      ]
+    })
+  end
 
   def blueprint_session(conn) do
     conn

@@ -40,3 +40,4 @@ npm-debug.log
 
 # Editor-generated files
 .elixir_ls
+priv/static/images/uploads/

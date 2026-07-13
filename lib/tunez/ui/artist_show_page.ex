@@ -2,7 +2,7 @@ defmodule Tunez.UI.ArtistShowPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -21,7 +21,7 @@ defmodule Tunez.UI.ArtistShowPage do
       authorize_if always()
     end
 
-    policy action([:follow, :unfollow, :destroy_album]) do
+    policy action(:destroy_album) do
       authorize_if actor_present()
     end
 
@@ -48,6 +48,13 @@ defmodule Tunez.UI.ArtistShowPage do
     has_one :artist, Tunez.Music.Artist do
       source_attribute :artist_id
       destination_attribute :id
+      public? true
+    end
+
+    has_many :artists, Tunez.Music.Artist do
+      source_attribute :artist_id
+      destination_attribute :id
+      public? true
     end
   end
 
@@ -70,15 +77,17 @@ defmodule Tunez.UI.ArtistShowPage do
                           if is_nil(^actor(:id)) do
                             nothing()
                           else
-                            if artist.followed_by_me do
-                              inline(:follow_toggle, [on_click: :unfollow], [
-                                inline(:follow_toggle_icon, [state: [selected: true]], [])
-                              ])
-                            else
-                              inline(:follow_toggle, [on_click: :follow], [
-                                inline(:follow_toggle_icon, [state: [selected: false]], [])
-                              ])
-                            end
+                            each(artists, :artist, [key: artist.id], [
+                              if artist.followed_by_me do
+                                inline(:follow_toggle, [on_click: {artist, :unfollow}], [
+                                  inline(:follow_toggle_icon, [state: [selected: true]], [])
+                                ])
+                              else
+                                inline(:follow_toggle, [on_click: {artist, :follow}], [
+                                  inline(:follow_toggle_icon, [state: [selected: false]], [])
+                                ])
+                              end
+                            ])
                           end
                         ]),
                       subtitle:
@@ -240,6 +249,17 @@ defmodule Tunez.UI.ArtistShowPage do
   actions do
     defaults [:read]
 
+    read :for_session do
+      description "Read artist detail UI state for one browser session."
+
+      argument :session_id, :uuid do
+        allow_nil? false
+        public? true
+      end
+
+      filter expr(session_id == ^arg(:session_id))
+    end
+
     create :mount do
       argument :artist_id, :uuid, allow_nil?: false
       change AshBlueprint.Changes.SetSessionId
@@ -248,47 +268,9 @@ defmodule Tunez.UI.ArtistShowPage do
       change set_attribute(:deleted?, false)
     end
 
-    update :follow do
-      require_atomic? false
-
-      change fn changeset, context ->
-        Ash.Changeset.before_action(changeset, fn changeset ->
-          case Tunez.Music.follow_artist(changeset.data.artist, scope: context) do
-            {:ok, _follow} ->
-              changeset
-
-            {:error, error} ->
-              Ash.Changeset.add_error(changeset, [
-                Ash.Error.Changes.InvalidChanges.exception(message: "Could not follow artist"),
-                error
-              ])
-          end
-        end)
-      end
-    end
-
-    update :unfollow do
-      require_atomic? false
-
-      change fn changeset, context ->
-        Ash.Changeset.before_action(changeset, fn changeset ->
-          case Tunez.Music.unfollow_artist(changeset.data.artist, scope: context) do
-            :ok ->
-              changeset
-
-            {:error, error} ->
-              Ash.Changeset.add_error(changeset, [
-                Ash.Error.Changes.InvalidChanges.exception(message: "Could not unfollow artist"),
-                error
-              ])
-          end
-        end)
-      end
-    end
-
     update :destroy_album do
       require_atomic? false
-      argument :album_id, :uuid, allow_nil?: false
+      argument :album_id, :uuid, allow_nil?: false, public?: true
 
       change fn changeset, context ->
         Ash.Changeset.before_action(changeset, fn changeset ->

@@ -2,7 +2,7 @@ defmodule Tunez.UI.ArtistIndexPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   # The sort vocabulary — ONE source for the attribute constraint, the
@@ -83,11 +83,13 @@ defmodule Tunez.UI.ArtistIndexPage do
     has_many :artists, Tunez.Music.Artist do
       no_attributes? true
       manual {Tunez.UI.ArtistIndexPage.ArtistsRelationship, mode: :page}
+      public? true
     end
 
     has_one :next_artist, Tunez.Music.Artist do
       no_attributes? true
       manual {Tunez.UI.ArtistIndexPage.ArtistsRelationship, mode: :next}
+      public? true
     end
   end
 
@@ -234,6 +236,17 @@ defmodule Tunez.UI.ArtistIndexPage do
 
   actions do
     defaults [:read]
+
+    read :for_session do
+      description "Read artist catalogue UI state for one browser session."
+
+      argument :session_id, :uuid do
+        allow_nil? false
+        public? true
+      end
+
+      filter expr(session_id == ^arg(:session_id))
+    end
 
     create :mount do
       accept [:q, :limit, :offset]

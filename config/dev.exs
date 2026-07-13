@@ -65,6 +65,7 @@ config :tunez, TunezWeb.Endpoint,
 
 # Enable dev routes for dashboard and mailbox
 config :tunez, dev_routes: true, token_signing_secret: "GYBWo6G4L2AiS3JPWB7ftE134JRh93Dt"
+config :tunez, mcp_upload_roots: [Path.expand("~/.codex/generated_images")]
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

@@ -4,7 +4,7 @@ defmodule Tunez.Music.Artist do
     domain: Tunez.Music,
     notifiers: [AshBlueprint.Notifier],
     data_layer: AshPostgres.DataLayer,
-    extensions: [AshGraphql.Resource, AshJsonApi.Resource],
+    extensions: [AshGraphql.Resource, AshJsonApi.Resource, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   graphql do
@@ -50,6 +50,10 @@ defmodule Tunez.Music.Artist do
     policy action(:update) do
       authorize_if actor_attribute_equals(:role, :admin)
       authorize_if actor_attribute_equals(:role, :editor)
+    end
+
+    policy action([:follow, :unfollow]) do
+      authorize_if actor_present()
     end
 
     policy action(:destroy) do
@@ -182,6 +186,44 @@ defmodule Tunez.Music.Artist do
     update :update do
       accept [:name, :biography]
       change Tunez.Music.Changes.UpdatePreviousNames
+    end
+
+    update :follow do
+      require_atomic? false
+
+      change fn changeset, context ->
+        Ash.Changeset.before_action(changeset, fn changeset ->
+          case Tunez.Music.follow_artist(changeset.data, scope: context) do
+            {:ok, _follow} ->
+              changeset
+
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not follow artist"),
+                error
+              ])
+          end
+        end)
+      end
+    end
+
+    update :unfollow do
+      require_atomic? false
+
+      change fn changeset, context ->
+        Ash.Changeset.before_action(changeset, fn changeset ->
+          case Tunez.Music.unfollow_artist(changeset.data, scope: context) do
+            :ok ->
+              changeset
+
+            {:error, error} ->
+              Ash.Changeset.add_error(changeset, [
+                Ash.Error.Changes.InvalidChanges.exception(message: "Could not unfollow artist"),
+                error
+              ])
+          end
+        end)
+      end
     end
 
     destroy :destroy do

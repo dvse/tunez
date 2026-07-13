@@ -5,7 +5,7 @@ defmodule Tunez.Music.ArtistFollower do
     notifiers: [AshBlueprint.Notifier],
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshGraphql.Resource]
+    extensions: [AshGraphql.Resource, AshLua.Resource]
 
   graphql do
     type :artist_follower
@@ -18,6 +18,36 @@ defmodule Tunez.Music.ArtistFollower do
     references do
       reference :artist, on_delete: :delete, index?: true
       reference :follower, on_delete: :delete
+    end
+  end
+
+  policies do
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    policy action_type(:create) do
+      authorize_if actor_present()
+    end
+
+    policy action_type(:destroy) do
+      authorize_if actor_present()
+    end
+
+    policy action(:unfollow) do
+      authorize_if actor_present()
+    end
+  end
+
+  relationships do
+    belongs_to :artist, Tunez.Music.Artist do
+      primary_key? true
+      allow_nil? false
+    end
+
+    belongs_to :follower, Tunez.Accounts.User do
+      primary_key? true
+      allow_nil? false
     end
   end
 
@@ -45,31 +75,22 @@ defmodule Tunez.Music.ArtistFollower do
 
       change filter expr(artist_id == ^arg(:artist_id) && follower_id == ^actor(:id))
     end
-  end
 
-  policies do
-    policy action_type(:read) do
-      authorize_if always()
-    end
+    action :unfollow, :boolean do
+      description "Stop the current actor from following an artist."
 
-    policy action_type(:create) do
-      authorize_if actor_present()
-    end
+      argument :artist_id, :uuid do
+        allow_nil? false
+        public? true
+      end
 
-    policy action_type(:destroy) do
-      authorize_if actor_present()
-    end
-  end
-
-  relationships do
-    belongs_to :artist, Tunez.Music.Artist do
-      primary_key? true
-      allow_nil? false
-    end
-
-    belongs_to :follower, Tunez.Accounts.User do
-      primary_key? true
-      allow_nil? false
+      run fn input, context ->
+        with {:ok, artist} <-
+               Tunez.Music.get_artist_by_id(input.arguments.artist_id, scope: context),
+             :ok <- Tunez.Music.unfollow_artist(artist, scope: context) do
+          {:ok, true}
+        end
+      end
     end
   end
 end

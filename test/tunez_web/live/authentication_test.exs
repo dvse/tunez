@@ -36,7 +36,9 @@ defmodule TunezWeb.AuthenticationTest do
       fn session ->
         session
         |> fill_in("Email", with: "other@sevenseacat.net")
+        |> refute_has("[part=field_error]", text: "is invalid")
         |> fill_in("Password", with: "password")
+        |> refute_has("[part=field_error]", text: "is invalid")
         |> click_button("Sign in")
       end
     )

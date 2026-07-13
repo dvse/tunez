@@ -444,6 +444,9 @@ defmodule Tunez.HTMLParity do
       tag == "input" and Enum.member?(attrs, {"type", "hidden"}) ->
         nil
 
+      obsolete_upstream_save_flash?(tag, attrs, children) ->
+        nil
+
       tag == "label" and phoenix_form_label_noise?(attrs, children) ->
         nil
 
@@ -466,6 +469,19 @@ defmodule Tunez.HTMLParity do
   end
 
   defp normalize_node(other), do: other
+
+  # The Ash UI keeps the original action/changeset errors as its sole error
+  # model. The upstream Phoenix forms add this generic second error alongside
+  # the useful field error; ignore only that exact obsolete oracle artifact.
+  defp obsolete_upstream_save_flash?("div", attrs, children) do
+    Enum.member?(attrs, {"id", "flash-error"}) and
+      children
+      |> Floki.text()
+      |> String.trim()
+      |> then(&(&1 in ["Could not save album data", "Could not save artist data"]))
+  end
+
+  defp obsolete_upstream_save_flash?(_tag, _attrs, _children), do: false
 
   # URL-link paging (upstream) and action paging (blueprint) are the same
   # control: both project offset/limit into the URL. Canonicalize to a
@@ -571,6 +587,7 @@ defmodule Tunez.HTMLParity do
        do: true
 
   defp datastar_generated_attribute?("data-on-" <> _event, _value), do: true
+  defp datastar_generated_attribute?("data-on:" <> _event, _value), do: true
 
   defp datastar_generated_attribute?("id", "bp-" <> generated),
     do: Regex.match?(~r/^[A-Za-z0-9_-]{16}$/, generated)
@@ -603,6 +620,13 @@ defmodule Tunez.HTMLParity do
       :error -> attribute
     end
   end
+
+  # Datastar is forwarded under /ds; routed anchors retain that prefix as
+  # their native/no-JS fallback. It is transport location, not UI structure.
+  defp normalize_generated_attribute({"href", "/ds"}), do: {"href", "/"}
+
+  defp normalize_generated_attribute({"href", "/ds/" <> path}),
+    do: {"href", "/" <> path}
 
   defp normalize_generated_attribute({name, value})
        when name in [
@@ -651,7 +675,11 @@ defmodule Tunez.HTMLParity do
   end
 
   defp normalize_document_node({tag, attrs, _children}, tag) when tag in ["html", "body"] do
-    attrs |> Enum.reject(&(elem(&1, 0) == "style")) |> Enum.sort()
+    attrs
+    |> Enum.reject(fn {name, value} ->
+      name == "style" or datastar_generated_attribute?(name, value)
+    end)
+    |> Enum.sort()
   end
 
   defp extract_one!(html, selector, scenario) do

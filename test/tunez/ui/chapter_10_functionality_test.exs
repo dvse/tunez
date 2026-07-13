@@ -145,9 +145,8 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
     test "invalid artist data is rejected without changing domain state", %{conn: conn} do
       artist = generate(artist(name: "Old Name"))
 
-      # FULL upstream parity: the failed save flashes AND shows the field
-      # error text inline; the bound control lights up (aria-invalid +
-      # message); the domain and the location stay put.
+      # The original Ash error is projected onto the bound control; the domain
+      # and the location stay put without adding a second generic flash error.
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/artists/#{artist.id}/edit")
@@ -156,9 +155,6 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> assert_has(~s(#artist_form_name[aria-invalid="true"]))
       |> assert_has(~s(#artist_form_name[data-blueprint-error]))
       |> assert_has(~s([part="field_error"]), text: "is required")
-      |> assert_has(~s([part="flash_message"][data-kind="error"]),
-        text: "Could not save artist data"
-      )
       |> assert_path("/artists/#{artist.id}/edit")
 
       assert Music.get_artist_by_id!(artist.id).name == "Old Name"
@@ -261,9 +257,6 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> assert_has(~s(#album_form_year_released[aria-invalid="true"]))
       |> assert_has(~s(#album_form_year_released[data-blueprint-error]))
       |> assert_has(~s([part="field_error"]), text: "is required")
-      |> assert_has(~s([part="flash_message"][data-kind="error"]),
-        text: "Could not save album data"
-      )
       |> assert_path("/artists/#{artist.id}/albums/new")
 
       refute get_by_name(Tunez.Music.Album, "Incomplete Album")
@@ -324,9 +317,8 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       refute Enum.at(updated_album.tracks, 1).id in [kept_track.id, removed_track.id]
       refute Enum.any?(updated_album.tracks, &(&1.id == removed_track.id))
 
-      # FULL upstream parity: the failed save flashes AND shows the field
-      # error text inline; the bound control lights up; the domain and the
-      # location stay put.
+      # The original Ash error is projected onto the bound control; the domain
+      # and the location stay put without adding a second generic flash error.
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/albums/#{album.id}/edit")
@@ -335,9 +327,6 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> assert_has(~s(#album_form_name[aria-invalid="true"]))
       |> assert_has(~s(#album_form_name[data-blueprint-error]))
       |> assert_has(~s([part="field_error"]), text: "is required")
-      |> assert_has(~s([part="flash_message"][data-kind="error"]),
-        text: "Could not save album data"
-      )
       |> assert_path("/albums/#{album.id}/edit")
 
       assert Music.get_album_by_id!(album.id).name == "New Name"

@@ -5,6 +5,7 @@ defmodule Tunez.Accounts.Notification do
     notifiers: [AshBlueprint.Notifier],
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
+    extensions: [AshLua.Resource],
     notifiers: [Ash.Notifier.PubSub]
 
   postgres do
@@ -14,19 +15,6 @@ defmodule Tunez.Accounts.Notification do
     references do
       reference :user, index?: true, on_delete: :delete
       reference :album
-    end
-  end
-
-  actions do
-    defaults [:read, :destroy]
-
-    create :create do
-      accept [:user_id, :album_id]
-    end
-
-    read :for_user do
-      prepare build(load: [album: [:artist]], sort: [inserted_at: :desc])
-      filter expr(user_id == ^actor(:id))
     end
   end
 
@@ -49,18 +37,6 @@ defmodule Tunez.Accounts.Notification do
     end
   end
 
-  pub_sub do
-    prefix "notifications"
-    module TunezWeb.Endpoint
-
-    transform fn notification ->
-      Map.take(notification.data, [:id, :user_id, :album_id])
-    end
-
-    publish :create, [:user_id]
-    publish :destroy, [:user_id]
-  end
-
   attributes do
     uuid_primary_key :id
 
@@ -74,6 +50,31 @@ defmodule Tunez.Accounts.Notification do
 
     belongs_to :album, Tunez.Music.Album do
       allow_nil? false
+    end
+  end
+
+  pub_sub do
+    prefix "notifications"
+    module TunezWeb.Endpoint
+
+    transform fn notification ->
+      Map.take(notification.data, [:id, :user_id, :album_id])
+    end
+
+    publish :create, [:user_id]
+    publish :destroy, [:user_id]
+  end
+
+  actions do
+    defaults [:read, :destroy]
+
+    create :create do
+      accept [:user_id, :album_id]
+    end
+
+    read :for_user do
+      prepare build(load: [album: [:artist]], sort: [inserted_at: :desc])
+      filter expr(user_id == ^actor(:id))
     end
   end
 end

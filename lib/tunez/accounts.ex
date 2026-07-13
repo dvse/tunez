@@ -1,5 +1,7 @@
 defmodule Tunez.Accounts do
-  use Ash.Domain, otp_app: :tunez, extensions: [AshGraphql.Domain, AshJsonApi.Domain]
+  use Ash.Domain,
+    otp_app: :tunez,
+    extensions: [AshGraphql.Domain, AshJsonApi.Domain, AshLua.Domain, AshAi]
 
   graphql do
     queries do
@@ -33,6 +35,13 @@ defmodule Tunez.Accounts do
           end
         end
       end
+    end
+  end
+
+  lua do
+    namespace "accounts.notification" do
+      action :for_user, Tunez.Accounts.Notification, :for_user
+      action :destroy, Tunez.Accounts.Notification, :destroy
     end
   end
 

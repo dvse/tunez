@@ -8,8 +8,9 @@ defmodule TunezWeb.DatastarModeTest do
     body = html_response(conn, 200)
 
     assert body =~ ~s(src="/ds/_ash_blueprint/datastar.js")
-    assert body =~ "data-blueprint-binding"
-    assert body =~ "data-bind"
+    # Datastar's minimal-attribute contract embeds binding keys in data-on dispatch URLs.
+    assert body =~ ~r{data-on:[^=]+="[^"]*/ds/_ash_blueprint/dispatch/}
+    refute body =~ "data-blueprint-binding"
 
     assert Enum.any?(get_resp_header(conn, "set-cookie"), fn cookie ->
              String.starts_with?(cookie, "_tunez_key=")
@@ -26,7 +27,12 @@ defmodule TunezWeb.DatastarModeTest do
     session_id = get_session(mount, "ash_blueprint_session_id")
 
     search_input = body |> Floki.parse_document!() |> Floki.find("input#search-text") |> hd()
-    binding_key = search_input |> Floki.attribute("data-bind") |> List.first()
+    [input_expression] = Floki.attribute(search_input, "data-on:input")
+
+    [_, encoded_binding] =
+      Regex.run(~r{/ds/_ash_blueprint/dispatch/([^&'"),\s]+)}, input_expression)
+
+    binding_key = URI.decode(encoded_binding)
     search_value = "datastar-search-value"
 
     response =

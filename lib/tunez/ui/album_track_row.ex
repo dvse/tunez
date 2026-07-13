@@ -1,7 +1,8 @@
 defmodule Tunez.UI.AlbumTrackRow do
   use Ash.Resource,
+    domain: Tunez.UI,
     data_layer: :embedded,
-    extensions: [AshBlueprint],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   policies do
@@ -101,9 +102,10 @@ defmodule Tunez.UI.AlbumTrackRow do
   end
 
   actions do
-    defaults create: :*, update: :*
+    defaults create: :*
 
     update :edit do
+      primary? true
       accept [:name, :duration]
     end
 
