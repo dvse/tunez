@@ -87,11 +87,6 @@ config :tunez,
   ash_authentication: [return_error_on_invalid_magic_link_token?: true]
 
 config :tunez,
-  root_layout_stylesheets: ["/assets/app.css"],
-  root_layout_application_scripts: [{"/assets/app.js", "module"}],
-  root_layout_html_attributes: [lang: "en", class: "min-h-full"],
-  root_layout_body_attributes: [class: "min-h-full antialiased mb-4"],
-  root_layout_ui_zoom: nil,
   root_layout_default_title: "Hello!",
   root_layout_title_suffix: " · Tunez"
 

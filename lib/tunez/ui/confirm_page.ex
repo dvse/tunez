@@ -9,6 +9,10 @@ defmodule Tunez.UI.ConfirmPage do
     private? false
   end
 
+  ash_blueprint do
+    stylesheets ["priv/static/assets/app.css"]
+  end
+
   routes do
     # Static query alias for the Datastar bridge; email links keep the path-token route below.
     route "/confirm_new_user" do

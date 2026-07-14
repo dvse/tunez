@@ -12,7 +12,17 @@ defmodule Tunez.UI.AlbumTrackRow do
   end
 
   attributes do
-    uuid_primary_key :id
+    # Embedded draft rows are addressed by their primary key across parent
+    # re-casts (add/edit/reorder round-trips carry the id back), so the key must
+    # be writable and accepted by create; the default fills it for brand-new rows.
+    attribute :id, :uuid do
+      primary_key? true
+      allow_nil? false
+      writable? true
+      public? true
+      default &Ash.UUID.generate/0
+    end
+
     attribute :track_id, :uuid, public?: true
 
     attribute :name, :string,

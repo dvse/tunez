@@ -9,6 +9,10 @@ defmodule Tunez.UI.ArtistFormPage do
     private? false
   end
 
+  ash_blueprint do
+    stylesheets ["priv/static/assets/app.css"]
+  end
+
   routes do
     route "/artists/new" do
       location(expr(if(not is_nil(saved_artist_id), do: "/artists/" <> saved_artist_id)))

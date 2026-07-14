@@ -15,7 +15,7 @@ defmodule TunezWeb.Router do
     plug :accepts, ["html"]
     plug :fetch_session
     plug AshBlueprint.Phoenix.EnsureSessionId
-    plug :put_root_layout, html: {AshBlueprint.Phoenix.RootLayout, :render}
+    plug :put_root_layout, html: {__MODULE__, :app_document}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
     plug :load_from_session
@@ -155,14 +155,37 @@ defmodule TunezWeb.Router do
           nil
       end
 
-    AshBlueprint.Phoenix.RootLayout.render(%{
-      inner_content: {:safe, content},
-      page_title: page_title,
-      root_layout_scripts: [
-        {script_path, "module"}
-        | Application.get_env(:tunez, :root_layout_application_scripts, [])
-      ]
-    })
+    # Reuse the SAME app document shell as the LiveView pages (document parity
+    # by construction), then splice in the Datastar runtime module. RootLayout
+    # emits the framework LiveView runtime scripts unconditionally (DESIGN §9 —
+    # the `root_layout_*` assign channels are inert), so the Datastar runtime is
+    # added here rather than swapped in the shell.
+    {:safe, html} = app_document(%{inner_content: {:safe, content}, page_title: page_title})
+
+    datastar_script = ~s(<script type="module" src="#{script_path}"></script>)
+
+    {:safe, String.replace(html, "</head>", datastar_script <> "</head>", global: false)}
+  end
+
+  # The framework RootLayout renders the document skeleton (head, stylesheet
+  # links, runtime scripts, runtime-state stamping) but no static <html>/<body>
+  # chrome — that is app-owned. Layer the app's document-language and base body
+  # classes over the shared skeleton so every rendered document (LiveView and
+  # Datastar) carries identical html/body attributes.
+  def app_document(assigns) do
+    {:safe, iodata} = AshBlueprint.Phoenix.RootLayout.render(assigns)
+
+    html =
+      iodata
+      |> IO.iodata_to_binary()
+      |> String.replace("<html", ~s(<html lang="en" class="min-h-full"), global: false)
+      |> String.replace(
+        "</head><body>",
+        ~s(</head><body class="min-h-full antialiased mb-4">),
+        global: false
+      )
+
+    {:safe, html}
   end
 
   def blueprint_session(conn) do

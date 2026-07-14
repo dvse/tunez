@@ -9,6 +9,10 @@ defmodule Tunez.UI.MagicSignInPage do
     private? false
   end
 
+  ash_blueprint do
+    stylesheets ["priv/static/assets/app.css"]
+  end
+
   routes do
     # Static query alias for the Datastar bridge; email links keep the path-token route below.
     route "/magic_link" do

@@ -69,10 +69,10 @@
 [part="artist_grid"] { @apply gap-6 lg:gap-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4; }
 [part="artist_name"] { @apply text-lg font-semibold; }
 [part="auth_link"] { @apply phx-submit-loading:opacity-75 rounded-lg font-medium leading-none inline-block py-2 px-2 text-xs bg-gray-100; }
-[part="auth_alternate"] { @apply mt-10 border-t border-zinc-200 pt-6 max-w-md; }
+[part="auth_alternate"] { @apply mt-10 border-t border-zinc-200 pt-6 max-w-[28rem]; }
 [part="auth_alternate_text"] { @apply mb-3 text-sm text-zinc-600; }
-[part="auth_form"] { @apply max-w-md; }
-[part="auth_intro"] { @apply mb-6 max-w-md text-zinc-600; }
+[part="auth_form"] { @apply max-w-[28rem]; }
+[part="auth_intro"] { @apply mb-6 max-w-[28rem] text-zinc-600; }
 [part="auth_secondary_link"] { @apply text-sm font-medium text-primary-700 underline; }
 [part="auth_switch"] { @apply mt-6 text-sm text-zinc-600; }
 [part="avatar"] { @apply rounded-full size-8; }
@@ -87,7 +87,7 @@
 [part="empty_state"] { @apply p-8 text-center; }
 [part="error_link"] { @apply phx-submit-loading:opacity-75 rounded-lg font-medium leading-none inline-block py-3 px-5 text-sm text-error-600 underline; }
 [part="error_link_small"] { @apply phx-submit-loading:opacity-75 rounded-lg font-medium leading-none inline-block py-2 px-3 text-sm text-error-600 underline; }
-[part="feedback"] { @apply my-4 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900; }
+[part="feedback"] { @apply my-4 rounded-lg border border-indigo-200 bg-primary-50 p-3 text-sm text-indigo-900; }
 [part="field_error"] { @apply mt-1.5 flex gap-1.5 text-sm leading-6 text-error-600 items-center; }
 [part="field_error_icon"] { @apply hero-exclamation-circle-mini mt-0.5 h-5 w-5 flex-none; }
 [part="field_label"] { @apply text-sm font-medium leading-6 text-zinc-800 error:text-error-600; }
@@ -109,8 +109,8 @@
 [part="flash_text"] { @apply text-sm; }
 [part="flash_title"] { @apply font-semibold text-sm; }
 [part="follow_toggle"] { @apply ml-3 inline-block; }
-[part="follow_toggle_icon"] { @apply hero-star w-8 h-8 bg-yellow-400 -mt-1.5 cursor-pointer; }
-[part="follow_toggle_icon"][aria-selected="true"] { @apply hero-star-solid w-8 h-8 bg-yellow-400; }
+[part="follow_toggle_icon"]:not([aria-selected="true"]) { @apply hero-star w-8 h-8 bg-yellow-400 -mt-1.5 cursor-pointer; }
+[part="follow_toggle_icon"][aria-selected="true"] { @apply hero-star-solid w-8 h-8 bg-yellow-400 -mt-1.5 cursor-pointer; }
 [part="followed_icon"] { @apply hero-star-solid w-8 h-8 bg-yellow-400 absolute top-2 right-2; }
 [part="follower_count"] { @apply text-zinc-500 text-sm whitespace-nowrap pt-1 pl-1; }
 [part="follower_count_icon"] { @apply hero-star size-4 -mt-0.5; }
@@ -161,7 +161,7 @@
 [part="sign_out_link"] { @apply block; }
 [part="site_header"] { @apply flex items-center w-full p-4 pb-2 border-b-2 border-primary-600; }
 [part="sort_control"] { @apply !inline-block; }
-[part="sort_control"] > [part="field_label"]::after { content: " "; white-space: pre; letter-spacing: -0.0009765625rem; }
+[part="sort_control"] > [part="field_label"]::after { content: " "; white-space: pre; }
 [part="sort_form"] { @apply hidden sm:inline; }
 [part="sort_select"] { @apply my-2 block w-full rounded-lg text-zinc-900 focus:ring focus:outline-none sm:leading-6 border-zinc-300 focus:border-zinc-400 focus:ring-zinc-100 error:border-error-400 error:focus:border-error-600 error:focus:ring-error-100 disabled:bg-gray-100 disabled:text-zinc-400 px-2 py-0.5 !w-fit !inline-block pr-8 text-sm; }
 [part="subtitle"] { @apply mt-2 text-sm leading-6 text-zinc-600; }
@@ -188,3 +188,41 @@
 [part="user_menu_container"] { @apply !ml-8; }
 [part="user_menu_identity"] { @apply border-b border-gray-300 p-2 pt-0; }
 [part="user_menu_sign_out"] { @apply p-2 pb-0; }
+
+/* Coverage punch list (AshBlueprint stylesheet cutover, 2026-07-14): parts
+   emitted by routed pages that previously had no [part=...] rule. Hidden
+   token inputs and structural wrappers need no visible paint; the rules
+   exist so declared paint covers every emitted part (DESIGN §9). */
+:where(
+  [part="csrf_token"],
+  [part="magic_link_token"],
+  [part="confirm_token"],
+  [part="reset_token"]
+) { appearance: none; }
+
+:where(
+  [part="album_form"],
+  [part="album_item"],
+  [part="artist_card_item"],
+  [part="artist_form"],
+  [part="auth_or"],
+  [part="biography_break"],
+  [part="brand_link"],
+  [part="cover_link"],
+  [part="line"],
+  [part="flash_copy"],
+  [part="notification_break"],
+  [part="notification_copy"],
+  [part="notification_item"],
+  [part="notifications_container"],
+  [part="page_header_actions_outer"],
+  [part="page_header_title"],
+  [part="signed_in_as"],
+  [part="sort_option"],
+  [part="track_editor_body"],
+  [part="track_editor_header_row"],
+  [part="track_editor_order_header"],
+  [part="track_editor_row"],
+  [part="track_table_body"],
+  [part="track_field"]
+) { outline: none; }

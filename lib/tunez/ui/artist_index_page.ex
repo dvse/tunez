@@ -26,6 +26,10 @@ defmodule Tunez.UI.ArtistIndexPage do
     private? false
   end
 
+  ash_blueprint do
+    stylesheets ["priv/static/assets/app.css"]
+  end
+
   routes do
     route "/" do
       query :q, :string

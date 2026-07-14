@@ -28,6 +28,16 @@ defmodule TunezWeb.Endpoint do
     gzip: false,
     only: TunezWeb.static_paths()
 
+  # AshBlueprint stylesheets are declared data: each entry is simultaneously a
+  # build input verified at compile time AND the served href (DESIGN §9). The
+  # declared entries name the built artifact under priv/static/, so serve the
+  # project's priv/static directory at the same path the declarations use.
+  plug Plug.Static,
+    at: "/priv/static",
+    from: :tunez,
+    gzip: false,
+    only: ~w(assets)
+
   plug AshBlueprint.Phoenix.Assets
 
   # Code reloading can be explicitly enabled under the

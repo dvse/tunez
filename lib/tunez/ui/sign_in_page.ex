@@ -9,6 +9,10 @@ defmodule Tunez.UI.SignInPage do
     private? false
   end
 
+  ash_blueprint do
+    stylesheets ["priv/static/assets/app.css"]
+  end
+
   routes do
     route "/sign-in"
   end

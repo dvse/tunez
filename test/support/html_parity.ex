@@ -5,7 +5,17 @@ defmodule Tunez.HTMLParity do
 
   @framework_attribute_prefixes ["phx-", "data-phx-", "data-blueprint-"]
   @viewport_widths [390, 640, 768, 1024, 1440]
-  @chrome "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  # Computed-style parity needs a headless Chromium-family browser. Honour
+  # CHROME_BIN first, then probe the usual per-OS locations (Linux CI installs
+  # `chromium`/`google-chrome`; macOS dev boxes carry Google Chrome in
+  # /Applications). The first existing path wins.
+  @chrome_candidates [
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  ]
   @batch_key {__MODULE__, :computed_style_batch}
 
   def begin_batch! do
@@ -71,7 +81,9 @@ defmodule Tunez.HTMLParity do
   end
 
   def render_blueprint_document do
-    {:safe, iodata} = AshBlueprint.Phoenix.RootLayout.render(%{inner_content: ""})
+    # Mirror what the app actually serves: the app-level document wrapper adds
+    # the html/body chrome over the framework RootLayout skeleton.
+    {:safe, iodata} = TunezWeb.Router.app_document(%{inner_content: ""})
     IO.iodata_to_binary(iodata)
   end
 
@@ -168,11 +180,15 @@ defmodule Tunez.HTMLParity do
   defp assert_computed_styles_same!([], _viewport_widths), do: :ok
 
   defp assert_computed_styles_same!(cases, viewport_widths) do
-    chrome = System.get_env("CHROME_BIN", @chrome)
+    chrome =
+      case System.get_env("CHROME_BIN") do
+        path when is_binary(path) -> path
+        nil -> Enum.find(@chrome_candidates, hd(@chrome_candidates), &File.exists?/1)
+      end
 
     ExUnit.Assertions.assert(
       File.exists?(chrome),
-      "computed-style parity requires Chrome at #{chrome}; set CHROME_BIN to override"
+      "computed-style parity requires Chrome; set CHROME_BIN or install one of #{inspect(@chrome_candidates)}"
     )
 
     blueprint_css = File.read!(Path.expand("../../priv/static/assets/app.css", __DIR__))

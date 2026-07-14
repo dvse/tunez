@@ -9,6 +9,10 @@ defmodule Tunez.UI.ArtistShowPage do
     private? false
   end
 
+  ash_blueprint do
+    stylesheets ["priv/static/assets/app.css"]
+  end
+
   routes do
     route "/artists/:artist_id" do
       location(expr(if(deleted?, do: "/")))
