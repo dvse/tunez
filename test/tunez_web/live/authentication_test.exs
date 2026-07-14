@@ -7,16 +7,17 @@ defmodule TunezWeb.AuthenticationTest do
     conn
     |> visit(~p"/")
     |> click_link("Register")
-    |> within(
-      "#register-form",
-      fn session ->
-        session
-        |> fill_in("Email", with: email)
-        |> fill_in("Password", with: "password")
-        |> fill_in("Password Confirmation", with: "password")
-        |> click_button("Register")
-      end
-    )
+    |> assert_path(~p"/register")
+
+    # PhoenixTest's static form handoff submits from the last HTTP response,
+    # which remains the index response after a live patch. Remount the asserted
+    # destination so the external authentication form is present in that response.
+    conn
+    |> visit(~p"/register")
+    |> fill_in("Email", with: email)
+    |> fill_in("Password", with: "password")
+    |> fill_in("Password Confirmation", with: "password")
+    |> click_button("Register")
     |> assert_path(~p"/")
     |> assert_has(flash(:info), text: "You are now signed in")
     |> assert_has("strong", text: email)
@@ -31,17 +32,18 @@ defmodule TunezWeb.AuthenticationTest do
     conn
     |> visit(~p"/")
     |> click_link("Sign In")
-    |> within(
-      "#sign-in-form",
-      fn session ->
-        session
-        |> fill_in("Email", with: "other@sevenseacat.net")
-        |> refute_has("[part=field_error]", text: "is invalid")
-        |> fill_in("Password", with: "password")
-        |> refute_has("[part=field_error]", text: "is invalid")
-        |> click_button("Sign in")
-      end
-    )
+    |> assert_path(~p"/sign-in")
+
+    conn
+    |> visit(~p"/sign-in")
+    |> within("#sign-in-form", fn session ->
+      session
+      |> fill_in("Email", with: "other@sevenseacat.net")
+      |> refute_has("[part=field_error]", text: "is invalid")
+      |> fill_in("Password", with: "password")
+      |> refute_has("[part=field_error]", text: "is invalid")
+      |> click_button("Sign in")
+    end)
     |> assert_path(~p"/")
     |> assert_has(flash(:info), text: "You are now signed in")
     |> assert_has("strong", text: "other@sevenseacat.net")

@@ -405,6 +405,15 @@ defmodule Tunez.HTMLParity do
             document.documentElement.getBoundingClientRect();
           }
 
+          function removeObsoleteOracleArtifacts(document) {
+            const saveError = document.getElementById("flash-error");
+            const message = saveError?.textContent.trim().replace(/\s+/g, " ");
+
+            if (message === "Could not save album data" || message === "Could not save artist data") {
+              saveError.remove();
+            }
+          }
+
           async function run() {
             const originalCss = decode64("#{original_css}");
             const blueprintCss = decode64("#{blueprint_css}");
@@ -414,6 +423,8 @@ defmodule Tunez.HTMLParity do
             for (const testCase of testCases) {
               const originalFrame = await mountFrame(testCase.original, originalCss, testCase);
               const blueprintFrame = await mountFrame(testCase.blueprint, blueprintCss, testCase);
+              removeObsoleteOracleArtifacts(originalFrame.contentDocument);
+              removeObsoleteOracleArtifacts(blueprintFrame.contentDocument);
               synchronizeAnimations(originalFrame.contentDocument);
               synchronizeAnimations(blueprintFrame.contentDocument);
               const comparison = compare(

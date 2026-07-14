@@ -51,9 +51,10 @@ defmodule TunezWeb.DatastarModeTest do
     assert Store.get(session_id).record.q == search_value
   end
 
-  test "an unknown binding returns the explicit stale-binding error", %{conn: conn} do
+  test "an unknown binding surfaces as page error state", %{conn: conn} do
     mount = get(conn, "/ds/")
     assert html_response(mount, 200)
+    session_id = get_session(mount, "ash_blueprint_session_id")
 
     response =
       mount
@@ -61,8 +62,9 @@ defmodule TunezWeb.DatastarModeTest do
       |> put_req_header("content-type", "application/json")
       |> post("/ds/_ash_blueprint/dispatch/not-a-live-key", "{}")
 
-    assert response.status == 404
-    assert response.resp_body =~ "unknown_or_stale_binding"
+    assert response.status == 200
+    assert get_resp_header(response, "content-type") == ["text/event-stream"]
+    assert [_unknown_target | _rest] = Store.get(session_id).errors
   end
 
   test "a signed-in session renders the user menu", %{conn: conn} do

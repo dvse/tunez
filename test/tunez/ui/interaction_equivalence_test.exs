@@ -700,39 +700,103 @@ for backend <- [:phoenix, :datastar] do
       tree = Floki.parse_document!(html)
 
       traffic
-      |> Enum.filter(&view_patch?/1)
+      |> Enum.filter(&(view_patch?(&1) or keyed_move_effect?(&1)))
       |> Enum.reduce(tree, &apply_datastar_event/2)
       |> Floki.raw_html()
     end
 
-    defp apply_datastar_event(%{selector: selector, mode: mode, elements: elements}, tree) do
+    defp apply_datastar_event(
+           %{selector: selector, mode: mode, elements: elements},
+           tree
+         )
+         when is_binary(elements) do
+      case Regex.run(
+             ~r{^<script data-effect="el\.remove\(\)">var p=document\.getElementById\(("(?:\\.|[^"])*")\);(\[.*\])\.forEach\(function\(i\)\{var n=document\.getElementById\(i\);if\(n&&p\)p\.appendChild\(n\);\}\);</script>$},
+             String.trim(elements)
+           ) do
+        [_, parent_json, ids_json] ->
+          parent_id = Jason.decode!(parent_json)
+          ids = Jason.decode!(ids_json)
+
+          assert [_parent] = Floki.find(tree, "##{parent_id}")
+
+          Floki.traverse_and_update(tree, fn
+            {tag, attrs, children} = node ->
+              if List.keyfind(attrs, "id", 0) == {"id", parent_id} do
+                by_id =
+                  Map.new(children, fn
+                    {_child_tag, child_attrs, _child_children} = child ->
+                      case List.keyfind(child_attrs, "id", 0) do
+                        {"id", id} -> {id, child}
+                        _other -> {make_ref(), child}
+                      end
+
+                    child ->
+                      {make_ref(), child}
+                  end)
+
+                moved = Enum.flat_map(ids, &(Map.take(by_id, [&1]) |> Map.values()))
+                retained = Enum.reject(children, &(child_id(&1) in ids))
+                {tag, attrs, retained ++ moved}
+              else
+                node
+              end
+
+            node ->
+              node
+          end)
+
+        _other ->
+          apply_datastar_fragment_event(selector, mode, elements, tree)
+      end
+    end
+
+    defp child_id({_tag, attrs, _children}) do
+      case List.keyfind(attrs, "id", 0) do
+        {"id", id} -> id
+        _other -> nil
+      end
+    end
+
+    defp child_id(_node), do: nil
+
+    defp apply_datastar_fragment_event(selector, mode, elements, tree) do
       assert is_binary(selector), "Datastar view patches must be selector-scoped"
 
       replacement = Floki.parse_fragment!(elements)
       tree = maybe_remove_moved_elements(tree, replacement, mode)
-      assert [_target] = Floki.find(tree, selector)
-      id = selector |> String.trim_leading("#") |> String.replace("\\", "")
 
-      Floki.traverse_and_update(tree, fn
-        {tag, attrs, children} = node ->
-          if List.keyfind(attrs, "id", 0) == {"id", id} do
-            case mode do
-              "outer" -> replacement
-              "replace" -> replacement
-              "remove" -> nil
-              "inner" -> {tag, attrs, replacement}
-              "append" -> {tag, attrs, children ++ replacement}
-              "prepend" -> {tag, attrs, replacement ++ children}
-              "before" -> replacement ++ [node]
-              "after" -> [node | replacement]
-            end
-          else
-            node
-          end
+      case Floki.find(tree, selector) do
+        [] ->
+          tree
 
-        node ->
-          node
-      end)
+        [_target] ->
+          id = selector |> String.trim_leading("#") |> String.replace("\\", "")
+
+          Floki.traverse_and_update(tree, fn
+            {tag, attrs, children} = node ->
+              if List.keyfind(attrs, "id", 0) == {"id", id} do
+                case mode do
+                  "outer" -> replacement
+                  "replace" -> replacement
+                  "remove" -> nil
+                  "inner" -> {tag, attrs, replacement}
+                  "append" -> {tag, attrs, children ++ replacement}
+                  "prepend" -> {tag, attrs, replacement ++ children}
+                  "before" -> replacement ++ [node]
+                  "after" -> [node | replacement]
+                end
+              else
+                node
+              end
+
+            node ->
+              node
+          end)
+
+        targets ->
+          flunk("Datastar selector #{selector} matched #{length(targets)} elements")
+      end
     end
 
     defp maybe_remove_moved_elements(tree, replacement, mode)
@@ -865,6 +929,15 @@ for backend <- [:phoenix, :datastar] do
     end
 
     defp view_patch?(_event), do: false
+
+    defp keyed_move_effect?(%{type: "datastar-patch-elements", elements: elements}) do
+      String.starts_with?(
+        String.trim_leading(elements),
+        "<script data-effect=\"el.remove()\">var p=document.getElementById("
+      )
+    end
+
+    defp keyed_move_effect?(_event), do: false
 
     defp navigation_effect?(%{type: "datastar-patch-elements", elements: elements}) do
       elements = String.trim_leading(elements)

@@ -212,9 +212,8 @@ defmodule TunezWeb.MCPTest do
     session_id = get_session(mount, "ash_blueprint_session_id")
     subject_id = "artist:#{artist.id}"
 
-    script = """
-    local row_fields = { "id", "track_id", "name", "duration", "position" }
-    local form_fields = { { tracks = row_fields } }
+    edit_script = """
+    local form_fields = { "tracks" }
     local identity = { session_id = "#{session_id}", subject_id = "#{subject_id}" }
 
     local added, err = ui.album_form_page.add_track({
@@ -242,41 +241,74 @@ defmodule TunezWeb.MCPTest do
     })
     if err ~= nil then return { stage = "edit", error = err } end
 
-    local removed, err = ui.album_form_page.edit({
-      input = {
-        session_id = identity.session_id,
-        subject_id = identity.subject_id,
-        tracks = {}
-      },
-      fields = form_fields
-    })
-    if err ~= nil then return { stage = "remove", error = err } end
-
-    return { added = added, edited = edited, removed = removed }
+    return { added = added, edited = edited }
     """
 
-    result =
+    edit_result =
       mount
       |> recycle()
       |> put_req_header("authorization", "Bearer #{actor.__metadata__.token}")
       |> rpc(1, "tools/call", %{
         "name" => "tunez_lua_eval",
-        "arguments" => %{"input" => %{"script" => script}}
+        "arguments" => %{"input" => %{"script" => edit_script}}
       })
       |> tool_result!()
 
-    assert result["error"] == nil
+    assert edit_result["error"] == nil
+    assert [%{"id" => row_id}] = edit_result["result"]["added"]["tracks"]
+    assert [%{"id" => ^row_id}] = edit_result["result"]["edited"]["tracks"]
 
-    assert [%{"name" => "", "duration" => "", "position" => 0}] =
-             result["result"]["added"]["tracks"]
+    assert %Tunez.UI.AlbumFormPage{
+             tracks: [
+               %Tunez.UI.AlbumTrackRow{
+                 id: ^row_id,
+                 name: "Opening Signal",
+                 duration: "3:42",
+                 position: 0
+               }
+             ]
+           } =
+             Ash.get!(
+               Tunez.UI.AlbumFormPage,
+               [session_id: session_id, subject_id: subject_id],
+               actor: actor
+             )
 
-    assert [%{"name" => "Opening Signal", "duration" => "3:42", "position" => 0}] =
-             result["result"]["edited"]["tracks"]
+    remove_script = """
+    local removed, err = ui.album_form_page.edit({
+      input = {
+        session_id = "#{session_id}",
+        subject_id = "#{subject_id}",
+        tracks = {}
+      },
+      fields = { "tracks" }
+    })
+    if err ~= nil then return { stage = "remove", error = err } end
+    return removed
+    """
 
-    assert result["result"]["removed"]["tracks"] == []
+    remove_result =
+      mount
+      |> recycle()
+      |> put_req_header("authorization", "Bearer #{actor.__metadata__.token}")
+      |> rpc(2, "tools/call", %{
+        "name" => "tunez_lua_eval",
+        "arguments" => %{"input" => %{"script" => remove_script}}
+      })
+      |> tool_result!()
+
+    assert remove_result["error"] == nil
+    assert remove_result["result"]["tracks"] == []
+
+    assert %Tunez.UI.AlbumFormPage{tracks: []} =
+             Ash.get!(
+               Tunez.UI.AlbumFormPage,
+               [session_id: session_id, subject_id: subject_id],
+               actor: actor
+             )
   end
 
-  test "MCP preserves nested Ash errors from album save", %{conn: conn} do
+  test "MCP preserves nested Ash error leaves from album save", %{conn: conn} do
     actor = generate(user(role: :admin))
     artist = generate(artist(actor: actor))
 
@@ -295,7 +327,7 @@ defmodule TunezWeb.MCPTest do
 
     local added, err = ui.album_form_page.add_track({
       input = identity,
-      fields = {{tracks = {"id"}}}
+      fields = {"tracks"}
     })
     if err ~= nil then return {stage = "add", error = err} end
 
@@ -330,8 +362,10 @@ defmodule TunezWeb.MCPTest do
 
     assert result["error"] == nil
 
+    # Upstream AshLua unwraps a bulk action's error list before encoding it,
+    # so the envelope class is unknown even though the original Ash leaf is preserved.
     assert %{
-             "class" => "invalid",
+             "class" => "unknown",
              "errors" => [
                %{
                  "code" => "invalid_attribute",

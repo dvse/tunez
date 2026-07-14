@@ -11,6 +11,7 @@ defmodule Tunez.UI.Flash do
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
     extensions: [AshLua.Resource],
+    notifiers: [AshBlueprint.Notifier],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
