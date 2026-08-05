@@ -44,6 +44,7 @@ config :spark,
     remove_parens?: true,
     "Ash.Resource": [
       section_order: [
+        :queue_resource,
         :authentication,
         :token,
         :user_identity,
@@ -68,6 +69,7 @@ config :spark,
     ],
     "Ash.Domain": [
       section_order: [
+        :queue,
         :graphql,
         :json_api,
         :resources,

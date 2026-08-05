@@ -2,11 +2,11 @@ defmodule Tunez.UI.AlbumTrackRow do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: :embedded,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   policies do
-    policy action([:create, :update, :edit, :remove]) do
+    policy always() do
       authorize_if always()
     end
   end
@@ -50,7 +50,9 @@ defmodule Tunez.UI.AlbumTrackRow do
               AshBlueprint.Type.RenderTree,
               expr(
                 row(:track_editor_row, [data: [id: position]], [
-                  cell(:track_editor_order, [], [inline(:track_editor_handle, [], [])]),
+                  cell(:track_editor_order, [], [
+                    inline(:track_editor_handle, [data: %{icon: "grabber"}], [])
+                  ]),
                   cell(:track_editor_cell, [], [
                     box(:track_field, [], [
                       input(
@@ -68,7 +70,7 @@ defmodule Tunez.UI.AlbumTrackRow do
                         nothing()
                       else
                         paragraph(:field_error, [role: "alert"], [
-                          inline(:field_error_icon, [], []),
+                          inline(:field_error_icon, [data: %{icon: "error"}], []),
                           text(join(field_errors(:name), ", "))
                         ])
                       end
@@ -91,7 +93,7 @@ defmodule Tunez.UI.AlbumTrackRow do
                         nothing()
                       else
                         paragraph(:field_error, [role: "alert"], [
-                          inline(:field_error_icon, [], []),
+                          inline(:field_error_icon, [data: %{icon: "error"}], []),
                           text(join(field_errors(:duration), ", "))
                         ])
                       end
@@ -103,7 +105,7 @@ defmodule Tunez.UI.AlbumTrackRow do
                       [type: :button, on_click: :remove, aria: [label: "Delete"]],
                       [
                         inline(:hidden_label, [], [text("Delete")]),
-                        inline(:track_delete_icon, [], [])
+                        inline(:track_delete_icon, [data: %{icon: "trash"}], [])
                       ]
                     )
                   ])

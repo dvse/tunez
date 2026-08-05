@@ -3,6 +3,21 @@ defmodule Tunez.Music.TrackTest do
 
   alias Tunez.Music, warn: false
 
+  test "public contracts expose stored order and duration seconds" do
+    assert AshJsonApi.Resource.Info.default_fields(Music.Track) == [
+             :order,
+             :name,
+             :duration_seconds
+           ]
+
+    assert Ash.Resource.Info.attribute(Music.Track, :order).public?
+    assert Ash.Resource.Info.attribute(Music.Track, :duration_seconds).public?
+    assert Ash.Resource.Info.aggregate(Music.Album, :duration_seconds).public?
+    refute Ash.Resource.Info.calculation(Music.Track, :number)
+    refute Ash.Resource.Info.calculation(Music.Track, :duration)
+    refute Ash.Resource.Info.calculation(Music.Album, :duration)
+  end
+
   describe "policies" do
     test "anyone can read track records" do
       track = generate(track(seed?: true))

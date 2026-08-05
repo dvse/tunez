@@ -1,12 +1,4 @@
 defmodule Tunez.UI.Flash do
-  @moduledoc """
-  One flash message per (session, kind), stamped with the page life it
-  was put in. Visibility is a pure comparison against the session's
-  page-life clock: a flash lives for the page life it was put in, plus
-  one navigation when it rides a redirect (`carry?: true`) — exactly
-  Phoenix flash semantics, as inspectable row state.
-  """
-
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
@@ -16,6 +8,16 @@ defmodule Tunez.UI.Flash do
 
   ets do
     private? false
+  end
+
+  resource do
+    description """
+    One flash message per (session, kind), stamped with the page life it
+    was put in. Visibility is a pure comparison against the session's
+    page-life clock: a flash lives for the page life it was put in, plus
+    one navigation when it rides a redirect (`carry?: true`) — exactly
+    Phoenix flash semantics, as inspectable row state.
+    """
   end
 
   policies do
@@ -36,6 +38,7 @@ defmodule Tunez.UI.Flash do
     attribute :message, :string, allow_nil?: false, public?: true
     attribute :life, :integer, allow_nil?: false, default: 0, public?: true
     attribute :carry?, :boolean, allow_nil?: false, default: false, public?: true
+    attribute :rank, :integer, allow_nil?: false, default: 0
   end
 
   relationships do
@@ -46,12 +49,6 @@ defmodule Tunez.UI.Flash do
   end
 
   calculations do
-    # severity display order: info, error, warning (upstream flash-group order)
-    calculate :rank,
-              :integer,
-              expr(if(kind == :info, do: 0, else: if(kind == :error, do: 1, else: 2))),
-              public?: true
-
     calculate :visible?,
               :boolean,
               expr(life + if(carry?, do: 1, else: 0) >= (page_life.life || 0)),
@@ -73,7 +70,18 @@ defmodule Tunez.UI.Flash do
       accept [:session_id, :kind, :message, :carry?]
 
       # registers the row for session GC (reads the accepted attribute)
-      change AshBlueprint.Changes.SetSessionId
+
+      change set_attribute(:rank, 0) do
+        where attribute_equals(:kind, :info)
+      end
+
+      change set_attribute(:rank, 1) do
+        where attribute_equals(:kind, :error)
+      end
+
+      change set_attribute(:rank, 2) do
+        where attribute_equals(:kind, :warning)
+      end
 
       change fn changeset, context ->
         life =

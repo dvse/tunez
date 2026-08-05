@@ -157,7 +157,7 @@ defmodule Tunez.Generator do
         :create,
         defaults: [
           album_id: album_id,
-          number: sequence(:track_number, &(&1 + 1)),
+          order: sequence(:track_number, & &1),
           duration: duration()
         ],
         overrides: opts,

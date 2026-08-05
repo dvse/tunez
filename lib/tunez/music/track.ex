@@ -13,7 +13,7 @@ defmodule Tunez.Music.Track do
 
   json_api do
     type "track"
-    default_fields [:number, :name, :duration]
+    default_fields [:order, :name, :duration_seconds]
   end
 
   postgres do
@@ -37,6 +37,7 @@ defmodule Tunez.Music.Track do
 
     attribute :order, :integer do
       allow_nil? false
+      public? true
     end
 
     attribute :name, :string do
@@ -46,6 +47,7 @@ defmodule Tunez.Music.Track do
 
     attribute :duration_seconds, :integer do
       allow_nil? false
+      public? true
       constraints min: 1
     end
 
@@ -59,20 +61,6 @@ defmodule Tunez.Music.Track do
     end
   end
 
-  calculations do
-    calculate :number, :integer, expr(order + 1) do
-      public? true
-    end
-
-    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes do
-      public? true
-    end
-  end
-
-  preparations do
-    prepare build(load: [:number, :duration])
-  end
-
   actions do
     defaults [:read, :destroy]
 
@@ -80,7 +68,34 @@ defmodule Tunez.Music.Track do
       primary? true
       accept [:order, :name, :album_id]
       argument :duration, :string, allow_nil?: false
-      change Tunez.Music.Changes.MinutesToSeconds, only_when_valid?: true
+
+      change fn changeset, _context ->
+               duration = Ash.Changeset.get_argument(changeset, :duration)
+
+               cond do
+                 not String.match?(duration, ~r/^\d+:\d{2}$/) ->
+                   Ash.Changeset.add_error(changeset,
+                     field: :duration,
+                     message: "use MM:SS format"
+                   )
+
+                 duration in ["0:00", "00:00"] ->
+                   Ash.Changeset.add_error(changeset,
+                     field: :duration,
+                     message: "must be at least 1 second long"
+                   )
+
+                 true ->
+                   [minutes, seconds] = String.split(duration, ":", parts: 2)
+
+                   Ash.Changeset.change_attribute(
+                     changeset,
+                     :duration_seconds,
+                     String.to_integer(minutes) * 60 + String.to_integer(seconds)
+                   )
+               end
+             end,
+             only_when_valid?: true
     end
 
     update :update do
@@ -88,7 +103,34 @@ defmodule Tunez.Music.Track do
       accept [:order, :name]
       require_atomic? false
       argument :duration, :string, allow_nil?: false
-      change Tunez.Music.Changes.MinutesToSeconds, only_when_valid?: true
+
+      change fn changeset, _context ->
+               duration = Ash.Changeset.get_argument(changeset, :duration)
+
+               cond do
+                 not String.match?(duration, ~r/^\d+:\d{2}$/) ->
+                   Ash.Changeset.add_error(changeset,
+                     field: :duration,
+                     message: "use MM:SS format"
+                   )
+
+                 duration in ["0:00", "00:00"] ->
+                   Ash.Changeset.add_error(changeset,
+                     field: :duration,
+                     message: "must be at least 1 second long"
+                   )
+
+                 true ->
+                   [minutes, seconds] = String.split(duration, ":", parts: 2)
+
+                   Ash.Changeset.change_attribute(
+                     changeset,
+                     :duration_seconds,
+                     String.to_integer(minutes) * 60 + String.to_integer(seconds)
+                   )
+               end
+             end,
+             only_when_valid?: true
     end
   end
 end

@@ -54,35 +54,84 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
     end
 
     test "authenticated users can follow and unfollow an artist", %{conn: conn} do
+      artist =
+        generate(artist(biography: "The sibling biography must survive every follow patch."))
+
+      session =
+        conn
+        |> insert_and_authenticate_user(:user)
+        |> visit(~p"/artists/#{artist.id}")
+
+      biography_html = fragment_html(session, "[part=biography]")
+      session = click_selector(session, "[part=follow_toggle]")
+
+      assert_has(session, ~s([part="follow_toggle_icon"][aria-selected="true"]))
+      assert_has(session, "h1", text: artist.name)
+      assert fragment_html(session, "[part=biography]") == biography_html
+
+      assert Music.get_artist_by_id!(artist.id, load: [:follower_count]).follower_count == 1
+
+      session = click_selector(session, "[part=follow_toggle]")
+
+      assert_has(session, ~s|[part="follow_toggle_icon"]:not([aria-selected="true"])|)
+      assert_has(session, "h1", text: artist.name)
+      assert fragment_html(session, "[part=biography]") == biography_html
+
+      assert Music.get_artist_by_id!(artist.id, load: [:follower_count]).follower_count == 0
+    end
+
+    test "follow page actions use typed artist ids and stale keys surface as page errors", %{
+      conn: conn
+    } do
+      for action_name <- [:follow_artist, :unfollow_artist] do
+        action = Ash.Resource.Info.action(Tunez.UI.ArtistShowPage, action_name)
+
+        assert [%{name: :artist_id, type: Ash.Type.UUID, allow_nil?: false, public?: true}] =
+                 action.arguments
+      end
+
       artist = generate(artist())
 
       session =
         conn
         |> insert_and_authenticate_user(:user)
         |> visit(~p"/artists/#{artist.id}")
-        |> click_selector("[part=follow_toggle]")
 
-      assert_has(session, ~s([part="follow_toggle_icon"][aria-selected="true"]))
-
-      assert Music.get_artist_by_id!(artist.id, load: [:follower_count]).follower_count == 1
+      # Keep the rendered binding alive while making its target stale. The
+      # page action must surface the domain not-found error through the normal
+      # dispatch error projection, never silently ignore the click.
+      _notifications =
+        Music.destroy_artist!(artist,
+          authorize?: false,
+          return_notifications?: true
+        )
 
       session
       |> click_selector("[part=follow_toggle]")
-      |> assert_has(~s|[part="follow_toggle_icon"]:not([aria-selected="true"])|)
-
-      assert Music.get_artist_by_id!(artist.id, load: [:follower_count]).follower_count == 0
+      |> assert_has(~s([part="flash_message"][data-kind="error"]))
     end
 
     test "admin can delete an album and artist", %{conn: conn} do
       album = generate(album())
+      artist = Music.get_artist_by_id!(album.artist_id)
+      sibling_album = generate(album(artist_id: artist.id, name: "Byte-stable sibling album"))
 
-      conn
-      |> insert_and_authenticate_user(:admin)
-      |> visit(~p"/artists/#{album.artist_id}")
-      |> click_link("#album-#{album.id} a", "Delete")
-      |> assert_has(~s([part="flash_message"][data-kind="info"]),
-        text: "Album deleted successfully"
-      )
+      session =
+        conn
+        |> insert_and_authenticate_user(:admin)
+        |> visit(~p"/artists/#{album.artist_id}")
+
+      sibling_album_html = fragment_html(session, "#album-#{sibling_album.id}")
+
+      session =
+        session
+        |> click_link("#album-#{album.id} a", "Delete")
+        |> assert_has(~s([part="flash_message"][data-kind="info"]),
+          text: "Album deleted successfully"
+        )
+
+      assert_has(session, "h1", text: artist.name)
+      assert fragment_html(session, "#album-#{sibling_album.id}") == sibling_album_html
 
       assert {:error, _error} = Music.get_album_by_id(album.id)
 
@@ -103,23 +152,47 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       artist = generate(artist())
       conn = insert_and_authenticate_user(conn, :user)
 
-      assert_raise Ash.Error.Forbidden, fn -> visit(conn, ~p"/artists/new") end
-      assert_raise Ash.Error.Forbidden, fn -> visit(conn, ~p"/artists/#{artist.id}/edit") end
+      conn
+      |> visit(~p"/artists/new")
+      |> assert_has(~s([data-blueprint-error="mount"][role="alert"]),
+        text: "This view could not be opened."
+      )
+
+      conn
+      |> visit(~p"/artists/#{artist.id}/edit")
+      |> assert_has(~s([data-blueprint-error="mount"][role="alert"]),
+        text: "This view could not be opened."
+      )
+
+      assert Tunez.UI.ArtistFormPage
+             |> Ash.read!(authorize?: false)
+             |> Enum.all?(&(&1.artist_id != artist.id))
     end
 
     test "admin creates and updates an artist", %{conn: conn} do
-      conn
-      |> insert_and_authenticate_user(:admin)
-      |> visit(~p"/artists/new")
-      |> change_field("#artist_form_name", "Temperance")
-      |> change_field("#artist_form_biography", "Electronic music")
-      |> assert_field_value("#artist_form_name", "Temperance")
-      |> assert_field_value("#artist_form_biography", "Electronic music")
-      |> click_button("Save")
-      |> assert_has(~s([part="flash_message"][data-kind="info"]),
-        text: "Artist saved successfully"
-      )
-      |> assert_has("h1", text: "Temperance")
+      session =
+        conn
+        |> insert_and_authenticate_user(:admin)
+        |> visit(~p"/artists/new")
+        |> change_field("#artist_form_name", "Temperance")
+        |> change_field("#artist_form_biography", "Electronic music")
+        |> assert_field_value("#artist_form_name", "Temperance")
+        |> assert_field_value("#artist_form_biography", "Electronic music")
+        |> click_button("Save")
+        |> assert_has(~s([part="flash_message"][data-kind="info"]),
+          text: "Artist saved successfully"
+        )
+        |> assert_has("h1", text: "Temperance")
+
+      heading_html = fragment_html(session, "h1")
+
+      dismissed_session =
+        session
+        |> click_selector("#flash-info")
+        |> refute_has(~s([part="flash_message"][data-kind="info"]))
+        |> assert_has("h1", text: "Temperance")
+
+      assert fragment_html(dismissed_session, "h1") == heading_html
 
       artist = get_by_name!(Tunez.Music.Artist, "Temperance")
       assert artist.biography == "Electronic music"
@@ -166,13 +239,21 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       album = generate(album())
       conn = insert_and_authenticate_user(conn, :user)
 
-      assert_raise Ash.Error.Forbidden, fn ->
-        visit(conn, ~p"/artists/#{album.artist_id}/albums/new")
-      end
+      conn
+      |> visit(~p"/artists/#{album.artist_id}/albums/new")
+      |> assert_has(~s([data-blueprint-error="mount"][role="alert"]),
+        text: "This view could not be opened."
+      )
 
-      # Ordinary users are forbidden from the form itself; the not-found
-      # masking of unauthorized albums applies to editors (next test).
-      assert_raise Ash.Error.Forbidden, fn -> visit(conn, ~p"/albums/#{album.id}/edit") end
+      conn
+      |> visit(~p"/albums/#{album.id}/edit")
+      |> assert_has(~s([data-blueprint-error="mount"][role="alert"]),
+        text: "This view could not be opened."
+      )
+
+      assert Tunez.UI.AlbumFormPage
+             |> Ash.read!(authorize?: false)
+             |> Enum.all?(&(&1.album_id != album.id and &1.artist_id != album.artist_id))
     end
 
     test "editors can mount only albums they created", %{conn: conn} do
@@ -186,7 +267,11 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> visit(~p"/albums/#{owned.id}/edit")
       |> assert_has("h1", text: "Update Album")
 
-      assert_raise Ash.Error.Invalid, fn -> visit(conn, ~p"/albums/#{unowned.id}/edit") end
+      conn
+      |> visit(~p"/albums/#{unowned.id}/edit")
+      |> assert_has(~s([data-blueprint-error="mount"][role="alert"]),
+        text: "This view could not be opened."
+      )
 
       assert Tunez.UI.AlbumFormPage
              |> Ash.read!(authorize?: false)
@@ -196,39 +281,68 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
     test "admin creates an album with editable embedded track rows", %{conn: conn} do
       artist = generate(artist())
 
-      conn
-      |> insert_and_authenticate_user(:admin)
-      |> visit(~p"/artists/#{artist.id}/albums/new")
-      |> change_field("#album_form_name", "Sample With Tracks")
-      |> change_field("#album_form_year_released", "2021")
-      |> change_field("#album_form_cover_image_url", "/images/sample.jpg")
-      |> assert_field_value("#album_form_name", "Sample With Tracks")
-      |> assert_field_value("#album_form_year_released", "2021")
-      |> assert_field_value("#album_form_cover_image_url", "/images/sample.jpg")
-      |> click_link("Add Track")
-      |> assert_field_value("#album_form_name", "Sample With Tracks")
-      |> assert_field_value("#album_form_year_released", "2021")
-      |> assert_field_value("#album_form_cover_image_url", "/images/sample.jpg")
-      |> assert_has("tr[data-id]", count: 1)
-      |> change_field("#album_form_tracks_0_name", "First Track")
-      |> change_field("#album_form_tracks_0_duration", "2:22")
-      |> click_link("Add Track")
-      |> assert_field_value("#album_form_tracks_0_name", "First Track")
-      |> assert_field_value("#album_form_tracks_0_duration", "2:22")
+      session =
+        conn
+        |> insert_and_authenticate_user(:admin)
+        |> visit(~p"/artists/#{artist.id}/albums/new")
+        |> change_field("#album_form_name", "Sample With Tracks")
+        |> change_field("#album_form_year_released", "2021")
+        |> change_field("#album_form_cover_image_url", "/images/sample.jpg")
+        |> assert_field_value("#album_form_name", "Sample With Tracks")
+        |> assert_field_value("#album_form_year_released", "2021")
+        |> assert_field_value("#album_form_cover_image_url", "/images/sample.jpg")
+        |> click_link("Add Track")
+        |> assert_field_value("#album_form_name", "Sample With Tracks")
+        |> assert_field_value("#album_form_year_released", "2021")
+        |> assert_field_value("#album_form_cover_image_url", "/images/sample.jpg")
+        |> assert_has("tr[data-id]", count: 1)
+        |> change_field("#album_form_tracks_0_name", "First Track")
+        |> change_field("#album_form_tracks_0_duration", "2:22")
+        |> click_link("Add Track")
+        |> assert_field_value("#album_form_tracks_0_name", "First Track")
+        |> assert_field_value("#album_form_tracks_0_duration", "2:22")
+        |> assert_has("tr[data-id]", count: 2)
+        |> change_field("#album_form_tracks_1_name", "Second Track")
+        |> change_field("#album_form_tracks_1_duration", "3:33")
+        |> click_link("Add Track")
+        |> assert_field_value("#album_form_tracks_0_name", "First Track")
+        |> assert_field_value("#album_form_tracks_0_duration", "2:22")
+        |> assert_field_value("#album_form_tracks_1_name", "Second Track")
+        |> assert_field_value("#album_form_tracks_1_duration", "3:33")
+        |> assert_has("tr[data-id]", count: 3)
+        |> change_field("#album_form_tracks_2_name", "Third Track")
+
+      retained_track_html =
+        for selector <- [
+              "#album_form_tracks_0_name",
+              "#album_form_tracks_0_duration",
+              "#album_form_tracks_1_name",
+              "#album_form_tracks_1_duration"
+            ],
+            do: fragment_html(session, selector)
+
+      session =
+        session
+        |> click_selector("tr[data-id='2'] button[part=track_delete_link]")
+        |> assert_has("tr[data-id]", count: 2)
+        |> assert_field_value("#album_form_tracks_0_name", "First Track")
+        |> assert_field_value("#album_form_tracks_0_duration", "2:22")
+        |> assert_field_value("#album_form_tracks_1_name", "Second Track")
+        |> assert_field_value("#album_form_tracks_1_duration", "3:33")
+
+      assert retained_track_html ==
+               for(
+                 selector <- [
+                   "#album_form_tracks_0_name",
+                   "#album_form_tracks_0_duration",
+                   "#album_form_tracks_1_name",
+                   "#album_form_tracks_1_duration"
+                 ],
+                 do: fragment_html(session, selector)
+               )
+
+      session
       |> assert_has("tr[data-id]", count: 2)
-      |> change_field("#album_form_tracks_1_name", "Second Track")
-      |> change_field("#album_form_tracks_1_duration", "3:33")
-      |> click_link("Add Track")
-      |> assert_field_value("#album_form_tracks_0_name", "First Track")
-      |> assert_field_value("#album_form_tracks_0_duration", "2:22")
-      |> assert_field_value("#album_form_tracks_1_name", "Second Track")
-      |> assert_field_value("#album_form_tracks_1_duration", "3:33")
-      |> assert_has("tr[data-id]", count: 3)
-      |> change_field("#album_form_tracks_2_name", "Third Track")
-      |> click_selector("tr[data-id='2'] button[part=track_delete_link]")
-      |> assert_has("tr[data-id]", count: 2)
-      |> assert_field_value("#album_form_tracks_0_name", "First Track")
-      |> assert_field_value("#album_form_tracks_1_name", "Second Track")
       |> click_button("Save")
       |> assert_has(~s([part="flash_message"][data-kind="info"]),
         text: "Album saved successfully"
@@ -275,28 +389,56 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
 
       [kept_track, removed_track] = album.tracks
 
-      conn
-      |> insert_and_authenticate_user(:admin)
-      |> visit(~p"/albums/#{album.id}/edit")
-      |> change_field("#album_form_name", "New Name")
-      |> change_field("#album_form_year_released", "2024")
-      |> change_field("#album_form_cover_image_url", "/images/updated.jpg")
-      |> change_field("#album_form_tracks_0_name", "Edited Existing Track")
-      |> change_field("#album_form_tracks_0_duration", "4:44")
-      |> click_link("Add Track")
-      |> assert_field_value("#album_form_name", "New Name")
-      |> assert_field_value("#album_form_year_released", "2024")
-      |> assert_field_value("#album_form_cover_image_url", "/images/updated.jpg")
-      |> assert_field_value("#album_form_tracks_0_name", "Edited Existing Track")
-      |> assert_field_value("#album_form_tracks_0_duration", "4:44")
-      |> assert_has("tr[data-id]", count: 3)
-      |> change_field("#album_form_tracks_2_name", "Added Track")
-      |> change_field("#album_form_tracks_2_duration", "5:55")
-      |> click_selector("tr[data-id='1'] button[part=track_delete_link]")
+      session =
+        conn
+        |> insert_and_authenticate_user(:admin)
+        |> visit(~p"/albums/#{album.id}/edit")
+        |> change_field("#album_form_name", "New Name")
+        |> change_field("#album_form_year_released", "2024")
+        |> change_field("#album_form_cover_image_url", "/images/updated.jpg")
+        |> change_field("#album_form_tracks_0_name", "Edited Existing Track")
+        |> change_field("#album_form_tracks_0_duration", "4:44")
+        |> click_link("Add Track")
+        |> assert_field_value("#album_form_name", "New Name")
+        |> assert_field_value("#album_form_year_released", "2024")
+        |> assert_field_value("#album_form_cover_image_url", "/images/updated.jpg")
+        |> assert_field_value("#album_form_tracks_0_name", "Edited Existing Track")
+        |> assert_field_value("#album_form_tracks_0_duration", "4:44")
+        |> assert_has("tr[data-id]", count: 3)
+        |> change_field("#album_form_tracks_2_name", "Added Track")
+        |> change_field("#album_form_tracks_2_duration", "5:55")
+
+      kept_track_html =
+        for selector <- ["#album_form_tracks_0_name", "#album_form_tracks_0_duration"],
+            do: fragment_html(session, selector)
+
+      shifted_track_values =
+        for selector <- ["#album_form_tracks_2_name", "#album_form_tracks_2_duration"],
+            do: field_value(session, selector)
+
+      session =
+        session
+        |> click_selector("tr[data-id='1'] button[part=track_delete_link]")
+        |> assert_has("tr[data-id]", count: 2)
+        |> assert_field_value("#album_form_tracks_0_name", "Edited Existing Track")
+        |> assert_field_value("#album_form_tracks_0_duration", "4:44")
+        |> assert_field_value("#album_form_tracks_1_name", "Added Track")
+        |> assert_field_value("#album_form_tracks_1_duration", "5:55")
+
+      assert kept_track_html ==
+               for(
+                 selector <- ["#album_form_tracks_0_name", "#album_form_tracks_0_duration"],
+                 do: fragment_html(session, selector)
+               )
+
+      assert shifted_track_values ==
+               for(
+                 selector <- ["#album_form_tracks_1_name", "#album_form_tracks_1_duration"],
+                 do: field_value(session, selector)
+               )
+
+      session
       |> assert_has("tr[data-id]", count: 2)
-      |> assert_field_value("#album_form_tracks_0_name", "Edited Existing Track")
-      |> assert_field_value("#album_form_tracks_1_name", "Added Track")
-      |> assert_field_value("#album_form_tracks_1_duration", "5:55")
       |> click_button("Save")
       |> assert_has(~s([part="flash_message"][data-kind="info"]),
         text: "Album saved successfully"
@@ -370,9 +512,15 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       assert Enum.any?(Ash.read!(Tunez.UI.NotificationsPage, authorize?: false), & &1.open?)
       assert_has(session, "[part=notifications_panel][aria-expanded=true]")
 
-      session
-      |> click_selector("[part=notification_item_link]")
-      |> refute_has("[part=notifications_badge]")
+      signed_in_email_html = fragment_html(session, "[part=email]")
+
+      dismissed_session =
+        session
+        |> click_selector("[part=notification_item_link]")
+        |> refute_has("[part=notifications_badge]")
+        |> assert_has("strong", text: to_string(user.email))
+
+      assert fragment_html(dismissed_session, "[part=email]") == signed_in_email_html
 
       assert {:error, _error} =
                Tunez.Accounts.get_notification_by_id(notification.id, actor: user)
@@ -397,23 +545,23 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
   end
 
   defp assert_field_value(session, selector, expected) do
-    unwrap(session, fn view ->
-      html =
-        view
-        |> Phoenix.LiveViewTest.element(selector)
-        |> Phoenix.LiveViewTest.render()
+    assert field_value(session, selector) == expected
+    session
+  end
 
-      nodes = Floki.parse_fragment!(html)
+  defp field_value(session, selector) do
+    nodes = session |> fragment_html(selector) |> Floki.parse_fragment!()
 
-      actual =
-        case Floki.attribute(nodes, "value") do
-          [value] -> value
-          [] -> Floki.text(nodes)
-        end
+    case Floki.attribute(nodes, "value") do
+      [value] -> value
+      [] -> Floki.text(nodes)
+    end
+  end
 
-      assert actual == expected
-      html
-    end)
+  defp fragment_html(%{view: view}, selector) do
+    view
+    |> Phoenix.LiveViewTest.element(selector)
+    |> Phoenix.LiveViewTest.render()
   end
 
   defp click_selector(session, selector) do

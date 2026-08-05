@@ -155,6 +155,35 @@ defmodule TunezWeb.MCPTest do
     assert %{"result" => 42, "error" => nil, "print_output" => []} = Jason.decode!(text)
   end
 
+  test "MCP exposes raw track order and duration seconds", %{conn: conn} do
+    album = generate(album(track_count: 1))
+    [track] = album.tracks
+
+    script = """
+    local rows, err = music.track.read({
+      filter = {id = "#{track.id}"},
+      fields = {"order", "duration_seconds"}
+    })
+    if err ~= nil then return nil, err end
+    return (rows.results and rows.results[1]) or rows[1]
+    """
+
+    result =
+      conn
+      |> rpc(1, "tools/call", %{
+        "name" => "tunez_lua_eval",
+        "arguments" => %{"input" => %{"script" => script}}
+      })
+      |> tool_result!()
+
+    assert result["error"] == nil
+
+    assert result["result"] == %{
+             "order" => track.order,
+             "duration_seconds" => track.duration_seconds
+           }
+  end
+
   test "MCP reads and drives semantic UI resource actions only through Lua", %{conn: conn} do
     mount = get(conn, "/")
     session_id = get_session(mount, "ash_blueprint_session_id")

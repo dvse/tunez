@@ -100,6 +100,17 @@ defmodule Tunez.UI do
     end
   end
 
+  tools do
+    tool :read_artist_catalogue_page, Tunez.UI.ArtistIndexPage, :for_session do
+      description """
+      Read the artist catalogue presentation state for a session_id. Does not mutate state and
+      returns the policy-visible page record with its derived render tree.
+      """
+
+      load [:view]
+    end
+  end
+
   resources do
     resource Tunez.UI.AlbumFormPage
     resource Tunez.UI.ArtistFormPage
@@ -116,7 +127,6 @@ defmodule Tunez.UI do
     end
 
     resource Tunez.UI.PageLife do
-      define :begin_page_life, action: :begin, args: [:session_id]
       define :current_page_life, action: :read, get_by: :session_id
     end
 

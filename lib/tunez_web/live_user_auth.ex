@@ -44,7 +44,7 @@ defmodule TunezWeb.LiveUserAuth do
       {:cont, socket}
     else
       with session_id when is_binary(session_id) <- session["ash_blueprint_session_id"] do
-        {:ok, _flash} = Tunez.UI.put_flash(session_id, :error, "Unauthorized!", authorize?: false)
+        {:ok, _flash} = Tunez.UI.put_flash(session_id, :error, "Unauthorized!")
       end
 
       {:halt, Phoenix.LiveView.redirect(socket, to: "/")}

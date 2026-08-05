@@ -1,13 +1,4 @@
 defmodule Tunez.UI.PageLife do
-  @moduledoc """
-  One row per UI session: the count of page mounts (navigations).
-
-  This is the session's page-life clock. Flashes are stamped with the
-  life they were put in and expire by pure integer comparison — see
-  `Tunez.UI.Flash.visible?`. No aging writes, no hidden lifecycle hooks:
-  every routed page's `:mount` declares `change Tunez.UI.Changes.BeginPageLife`.
-  """
-
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
@@ -16,6 +7,18 @@ defmodule Tunez.UI.PageLife do
 
   ets do
     private? false
+  end
+
+  resource do
+    description """
+    One row per UI session: the count of page mounts (navigations).
+
+    This is the session's page-life clock. Flashes are stamped with the
+    life they were put in and expire by pure integer comparison — see
+    `Tunez.UI.Flash.visible?`. No aging writes and no app-authored lifecycle
+    hooks: `Tunez.UI.Blueprint` supplies the clock contract to routed mounts
+    through the compile-independent `Tunez.UI.PageLifeDomain` interface.
+    """
   end
 
   policies do
@@ -43,7 +46,6 @@ defmodule Tunez.UI.PageLife do
       argument :session_id, :uuid, allow_nil?: false
       change set_attribute(:session_id, arg(:session_id))
       # registers the row for session GC (falls through to the attribute)
-      change AshBlueprint.Changes.SetSessionId
       # first mount inserts at 1; remounts increment atomically against
       # the stored row (the atomic applies only on the conflict branch)
       change set_attribute(:life, 1)

@@ -3,6 +3,64 @@ defmodule TunezWeb.DatastarModeTest do
 
   alias AshBlueprint.Datastar.Store
 
+  test "routed document titles use stored UI fields and the real artist name" do
+    stored_title_resources = [
+      Tunez.UI.SignInPage,
+      Tunez.UI.ResetPage,
+      Tunez.UI.RegisterPage,
+      Tunez.UI.AlbumFormPage,
+      Tunez.UI.MagicSignInPage,
+      Tunez.UI.ConfirmPage,
+      Tunez.UI.ArtistFormPage,
+      Tunez.UI.ArtistIndexPage
+    ]
+
+    Enum.each(stored_title_resources, fn resource ->
+      assert %{type: Ash.Type.String, allow_nil?: false, public?: true} =
+               Ash.Resource.Info.attribute(resource, :page_title)
+
+      refute Ash.Resource.Info.calculation(resource, :page_title)
+    end)
+
+    refute Ash.Resource.Info.attribute(Tunez.UI.ArtistShowPage, :page_title)
+    refute Ash.Resource.Info.calculation(Tunez.UI.ArtistShowPage, :page_title)
+
+    artist = generate(artist())
+    album = generate(album(artist_id: artist.id))
+    admin = generate(user(role: :admin))
+
+    requests = [
+      {:public, "/", "Artists"},
+      {:public, "/ds/", "Artists"},
+      {:public, "/reset", "Reset password"},
+      {:public, "/password-reset/reset-token", "Choose a new password"},
+      {:public, "/artists/#{artist.id}", artist.name},
+      {:public, "/ds/artists/#{artist.id}", artist.name},
+      {:admin, "/artists/new", "New Artist"},
+      {:admin, "/artists/#{artist.id}/edit", "Update Artist"},
+      {:admin, "/artists/#{artist.id}/albums/new", "New Album"},
+      {:admin, "/albums/#{album.id}/edit", "Update Album"}
+    ]
+
+    Enum.each(requests, fn {actor, path, expected_title} ->
+      request_conn =
+        case actor do
+          :public -> Phoenix.ConnTest.build_conn()
+          :admin -> Phoenix.ConnTest.build_conn() |> log_in_user(admin)
+        end
+
+      title =
+        request_conn
+        |> get(path)
+        |> html_response(200)
+        |> Floki.parse_document!()
+        |> Floki.find("title")
+        |> Floki.text()
+
+      assert title == expected_title <> " · Tunez", "unexpected title for #{path}"
+    end)
+  end
+
   test "GET /ds/ mounts the artist index with bindings and the shared session", %{conn: conn} do
     conn = get(conn, "/ds/")
     body = html_response(conn, 200)

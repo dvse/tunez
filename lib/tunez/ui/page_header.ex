@@ -2,7 +2,7 @@ defmodule Tunez.UI.PageHeader do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -58,7 +58,13 @@ defmodule Tunez.UI.PageHeader do
                             on_click: :toggle_menu,
                             on_click_away: :close_menu
                           ],
-                          [inline(:page_header_toggle_icon, [], [])]
+                          [
+                            inline(
+                              :page_header_toggle_icon,
+                              [data: %{icon: "chevron-down"}],
+                              []
+                            )
+                          ]
                         ),
                         box(
                           :page_header_menu,
@@ -94,7 +100,6 @@ defmodule Tunez.UI.PageHeader do
 
     create :mount do
       accept [:kind, :menu_id, :title, :subtitle, :actions]
-      change AshBlueprint.Changes.SetSessionId
     end
 
     update :toggle_menu do

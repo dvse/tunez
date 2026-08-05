@@ -1,7 +1,31 @@
 defmodule Tunez.Music do
   use Ash.Domain,
     otp_app: :tunez,
-    extensions: [AshGraphql.Domain, AshJsonApi.Domain, AshPhoenix, AshLua.Domain, AshAi]
+    extensions: [
+      AshQueue.Domain,
+      AshGraphql.Domain,
+      AshJsonApi.Domain,
+      AshPhoenix,
+      AshLua.Domain,
+      AshAi
+    ]
+
+  queue do
+    resources do
+      queue Tunez.Music.Queue
+      cron(Tunez.Music.Cron)
+      queue_control(Tunez.Music.QueueControl)
+      queue_key(Tunez.Music.QueueKey)
+    end
+
+    runtime do
+      retention(completed: :delete)
+
+      queues do
+        queue(:album_notifications, limit: 10)
+      end
+    end
+  end
 
   graphql do
     queries do
@@ -73,6 +97,23 @@ defmodule Tunez.Music do
       action :for_artist, Tunez.Music.ArtistFollower, :for_artist
       action :create, Tunez.Music.ArtistFollower, :create
       action :unfollow, Tunez.Music.ArtistFollower, :unfollow
+    end
+  end
+
+  tools do
+    tool :browse_music_artists, Tunez.Music.Artist, :browse do
+      description """
+      Browse the artist catalogue. Accepts optional name query, sort, limit, and offset inputs;
+      does not mutate state; returns policy-visible artist records for the requested window.
+      """
+
+      load [
+        :follower_count,
+        :followed_by_me,
+        :album_count,
+        :latest_album_year_released,
+        :cover_image_url
+      ]
     end
   end
 
@@ -148,6 +189,10 @@ defmodule Tunez.Music do
       end
 
       define :followers_for_artist, action: :for_artist, args: [:artist_id]
+
+      define :missing_notification_followers_for_album,
+        action: :missing_album_notifications,
+        args: [:artist_id, :album_id]
     end
   end
 end

@@ -2,7 +2,7 @@ defmodule Tunez.UI.FlashStack do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -52,7 +52,11 @@ defmodule Tunez.UI.FlashStack do
                       ],
                       [
                         box(:flash_grid, [], [
-                          inline(:flash_kind_icon, [data: [kind: :error]], []),
+                          inline(
+                            :flash_kind_icon,
+                            [data: %{kind: :error, icon: "error"}],
+                            []
+                          ),
                           box(:flash_copy, [], [
                             paragraph(:flash_text, [], [
                               text(path(find_by(errors(), [:field], nil), [:message]))
@@ -61,7 +65,7 @@ defmodule Tunez.UI.FlashStack do
                           button(
                             :flash_close,
                             [type: "button", aria: [label: "close"]],
-                            [inline(:flash_close_icon, [], [])]
+                            [inline(:flash_close_icon, [data: %{icon: "close"}], [])]
                           )
                         ])
                       ]
@@ -80,14 +84,32 @@ defmodule Tunez.UI.FlashStack do
                         ],
                         [
                           box(:flash_grid, [], [
-                            inline(:flash_kind_icon, [data: [kind: flash.kind]], []),
+                            inline(
+                              :flash_kind_icon,
+                              [
+                                data: %{
+                                  kind: flash.kind,
+                                  icon:
+                                    if flash.kind == :info do
+                                      "pass-filled"
+                                    else
+                                      if flash.kind == :error do
+                                        "error"
+                                      else
+                                        "warning"
+                                      end
+                                    end
+                                }
+                              ],
+                              []
+                            ),
                             box(:flash_copy, [], [
                               paragraph(:flash_text, [], [text(flash.message)])
                             ]),
                             button(
                               :flash_close,
                               [type: "button", aria: [label: "close"]],
-                              [inline(:flash_close_icon, [], [])]
+                              [inline(:flash_close_icon, [data: %{icon: "close"}], [])]
                             )
                           ])
                         ]
@@ -101,18 +123,22 @@ defmodule Tunez.UI.FlashStack do
                     [dom_id: "client-error", role: "alert", hidden: true, data: [kind: :error]],
                     [
                       box(:flash_grid, [], [
-                        inline(:flash_kind_icon, [data: [kind: :error]], []),
+                        inline(
+                          :flash_kind_icon,
+                          [data: %{kind: :error, icon: "error"}],
+                          []
+                        ),
                         box(:flash_copy, [], [
                           paragraph(:flash_title, [], [text("We can't find the internet")]),
                           paragraph(:flash_text, [], [
                             text("Attempting to reconnect"),
-                            inline(:flash_spinner, [], [])
+                            inline(:flash_spinner, [data: %{icon: "loading"}], [])
                           ])
                         ]),
                         button(
                           :flash_close,
                           [type: "button", aria: [label: "close"]],
-                          [inline(:flash_close_icon, [], [])]
+                          [inline(:flash_close_icon, [data: %{icon: "close"}], [])]
                         )
                       ])
                     ]
@@ -122,18 +148,22 @@ defmodule Tunez.UI.FlashStack do
                     [dom_id: "server-error", role: "alert", hidden: true, data: [kind: :error]],
                     [
                       box(:flash_grid, [], [
-                        inline(:flash_kind_icon, [data: [kind: :error]], []),
+                        inline(
+                          :flash_kind_icon,
+                          [data: %{kind: :error, icon: "error"}],
+                          []
+                        ),
                         box(:flash_copy, [], [
                           paragraph(:flash_title, [], [text("Something went wrong!")]),
                           paragraph(:flash_text, [], [
                             text("Hang in there while we get back on track"),
-                            inline(:flash_spinner, [], [])
+                            inline(:flash_spinner, [data: %{icon: "loading"}], [])
                           ])
                         ]),
                         button(
                           :flash_close,
                           [type: "button", aria: [label: "close"]],
-                          [inline(:flash_close_icon, [], [])]
+                          [inline(:flash_close_icon, [data: %{icon: "close"}], [])]
                         )
                       ])
                     ]
@@ -164,7 +194,6 @@ defmodule Tunez.UI.FlashStack do
       primary? true
       upsert? true
       upsert_identity :session_instance
-      change AshBlueprint.Changes.SetSessionId
     end
 
     update :dismiss do

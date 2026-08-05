@@ -77,7 +77,7 @@ defmodule Tunez.Accounts.Token do
 
     create :revoke_token do
       description "Revoke a token. Creates a revocation token corresponding to the provided token."
-      accept [:extra_data]
+      accept []
       argument :token, :string, allow_nil?: false, sensitive?: true
 
       change AshAuthentication.TokenResource.RevokeTokenChange
@@ -85,7 +85,7 @@ defmodule Tunez.Accounts.Token do
 
     create :revoke_jti do
       description "Revoke a token by JTI. Creates a revocation token corresponding to the provided jti."
-      accept [:extra_data]
+      accept []
       argument :subject, :string, allow_nil?: false, sensitive?: true
       argument :jti, :string, allow_nil?: false, sensitive?: true
 
@@ -94,7 +94,7 @@ defmodule Tunez.Accounts.Token do
 
     create :store_token do
       description "Stores a token used for the provided purpose."
-      accept [:extra_data, :purpose]
+      accept [:purpose]
       argument :token, :string, allow_nil?: false, sensitive?: true
       change AshAuthentication.TokenResource.StoreTokenChange
     end
@@ -106,7 +106,7 @@ defmodule Tunez.Accounts.Token do
 
     update :revoke_all_stored_for_subject do
       description "Revokes all stored tokens for a specific subject."
-      accept [:extra_data]
+      accept []
       argument :subject, :string, allow_nil?: false, sensitive?: true
       change AshAuthentication.TokenResource.RevokeAllStoredForSubjectChange
     end

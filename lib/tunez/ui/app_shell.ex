@@ -2,7 +2,7 @@ defmodule Tunez.UI.AppShell do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -56,7 +56,7 @@ defmodule Tunez.UI.AppShell do
                   box(:site_header, [], [
                     box(:brand_container, [], [
                       link(:brand_link, [to: "/"], [
-                        inline(:brand_icon, [], []),
+                        inline(:brand_icon, [data: %{icon: "music"}], []),
                         inline(:brand_name, [], [text("Tunez")])
                       ])
                     ]),
@@ -156,8 +156,6 @@ defmodule Tunez.UI.AppShell do
 
         Ash.Changeset.force_change_attribute(changeset, :avatar_seed, seed)
       end
-
-      change AshBlueprint.Changes.SetSessionId
     end
 
     update :toggle_menu do

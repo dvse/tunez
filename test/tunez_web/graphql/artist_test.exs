@@ -4,14 +4,19 @@ defmodule TunezWeb.Graphql.ArtistTest do
   describe "queries" do
     test "getArtistById" do
       artist = generate(artist(name: "Test Name"))
-      album = generate(album(artist_id: artist.id))
+      album = generate(album(artist_id: artist.id, track_count: 1))
+      [track] = album.tracks
 
       assert {:ok, resp} =
                """
                query getArtistById($id: ID!) {
                  getArtistById(id: $id) {
                    name
-                   albums { name }
+                   albums {
+                     name
+                     durationSeconds
+                     tracks { order durationSeconds }
+                   }
                  }
                }
                """
@@ -20,7 +25,16 @@ defmodule TunezWeb.Graphql.ArtistTest do
                )
 
       assert resp.data["getArtistById"]["name"] == "Test Name"
-      assert resp.data["getArtistById"]["albums"] == [%{"name" => album.name}]
+
+      assert resp.data["getArtistById"]["albums"] == [
+               %{
+                 "name" => album.name,
+                 "durationSeconds" => track.duration_seconds,
+                 "tracks" => [
+                   %{"order" => track.order, "durationSeconds" => track.duration_seconds}
+                 ]
+               }
+             ]
     end
 
     test "searchArtists" do

@@ -2,7 +2,7 @@ defmodule Tunez.UI.AlbumFormPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -10,7 +10,10 @@ defmodule Tunez.UI.AlbumFormPage do
   end
 
   ash_blueprint do
-    stylesheets ["priv/static/assets/app.css"]
+    stylesheets([
+      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/assets/app.css"
+    ])
   end
 
   routes do
@@ -40,6 +43,7 @@ defmodule Tunez.UI.AlbumFormPage do
     attribute :artist_id, :uuid, public?: true
     attribute :saved_artist_id, :string, public?: true
     attribute :album_id, :uuid, public?: true
+    attribute :page_title, :string, allow_nil?: false, default: "New Album", public?: true
 
     attribute :name, :string,
       allow_nil?: false,
@@ -91,11 +95,6 @@ defmodule Tunez.UI.AlbumFormPage do
   end
 
   calculations do
-    calculate :page_title,
-              :string,
-              expr(if(is_nil(album_id), do: "New Album", else: "Update Album")),
-              public?: true
-
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -248,14 +247,13 @@ defmodule Tunez.UI.AlbumFormPage do
       # editable attributes untouched, preserving in-progress input.
       upsert? true
       upsert_identity :session_instance
-      upsert_fields [:artist_id, :album_id, :saved_artist_id]
+      upsert_fields [:artist_id, :album_id, :saved_artist_id, :page_title]
 
       argument :artist_id, :uuid
       argument :album_id, :uuid
       validate present([:artist_id, :album_id], exactly: 1)
-      change AshBlueprint.Changes.SetSessionId
-      change Tunez.UI.Changes.BeginPageLife
       change set_attribute(:artist_id, arg(:artist_id))
+      change set_attribute(:page_title, "Update Album"), where: [present(:album_id)]
 
       change fn changeset, _context ->
         case {
@@ -281,25 +279,41 @@ defmodule Tunez.UI.AlbumFormPage do
       change set_attribute(:saved_artist_id, nil)
 
       change fn changeset, context ->
-        if Ash.Changeset.get_argument(changeset, :album_id) do
+        if album_id = Ash.Changeset.get_argument(changeset, :album_id) do
           Ash.Changeset.before_action(changeset, fn changeset ->
-            with {:ok, page} <- Ash.Changeset.apply_attributes(changeset),
-                 {:ok, %{album: %Tunez.Music.Album{} = album}} <-
-                   Ash.load(page, [album: [tracks: [:duration]]], scope: context) do
-              Ash.Changeset.force_change_attributes(changeset, %{
-                name: album.name,
-                year_released: to_string(album.year_released),
-                cover_image_url: album.cover_image_url || "",
-                tracks: track_rows(album.tracks)
-              })
-            else
-              {:error, error} ->
-                error
-                |> Ash.Error.to_error_class()
-                |> Map.fetch!(:errors)
-                |> then(&Ash.Changeset.add_error(changeset, &1))
+            case Tunez.Music.get_manageable_album_by_id(album_id,
+                   load: [:tracks],
+                   scope: context
+                 ) do
+              {:ok, album} ->
+                Ash.Changeset.force_change_attributes(changeset, %{
+                  name: album.name,
+                  year_released: to_string(album.year_released),
+                  cover_image_url: album.cover_image_url || "",
+                  tracks:
+                    case album.tracks do
+                      tracks when is_list(tracks) ->
+                        Enum.with_index(tracks, fn track, position ->
+                          seconds = rem(track.duration_seconds, 60)
 
-              _missing_album ->
+                          %{
+                            track_id: track.id,
+                            name: track.name,
+                            duration:
+                              to_string(div(track.duration_seconds - seconds, 60)) <>
+                                ":" <> String.pad_leading(to_string(seconds), 2, "0"),
+                            position: position
+                          }
+                        end)
+
+                      _not_loaded ->
+                        []
+                    end
+                })
+
+              {:error, _error} ->
+                # The seed read is non-authoritative. The declared
+                # manage_relationship lookup owns the policy/not-found outcome.
                 changeset
             end
           end)
@@ -414,14 +428,14 @@ defmodule Tunez.UI.AlbumFormPage do
           result =
             if is_nil(data.album_id) do
               Tunez.Music.create_album(Map.put(input, :artist_id, data.artist_id),
-                load: [tracks: [:duration]],
+                load: [:tracks],
                 scope: context
               )
             else
               with {:ok, %{album: %Tunez.Music.Album{} = album}} <-
                      Ash.load(data, :album, scope: context) do
                 Tunez.Music.update_album(album, input,
-                  load: [tracks: [:duration]],
+                  load: [:tracks],
                   scope: context
                 )
               end
@@ -439,7 +453,25 @@ defmodule Tunez.UI.AlbumFormPage do
                 name: album.name,
                 year_released: to_string(album.year_released),
                 cover_image_url: album.cover_image_url || "",
-                tracks: track_rows(album.tracks)
+                tracks:
+                  case album.tracks do
+                    tracks when is_list(tracks) ->
+                      Enum.with_index(tracks, fn track, position ->
+                        seconds = rem(track.duration_seconds, 60)
+
+                        %{
+                          track_id: track.id,
+                          name: track.name,
+                          duration:
+                            to_string(div(track.duration_seconds - seconds, 60)) <>
+                              ":" <> String.pad_leading(to_string(seconds), 2, "0"),
+                          position: position
+                        }
+                      end)
+
+                    _not_loaded ->
+                      []
+                  end
               })
 
             {:error, error} ->
@@ -450,19 +482,6 @@ defmodule Tunez.UI.AlbumFormPage do
           end
         end)
       end
-    end
-  end
-
-  # helper: track_rows/1 — shared domain-track to embedded-row storage conversion for mount and save
-  defp track_rows(tracks) do
-    case tracks do
-      tracks when is_list(tracks) ->
-        Enum.with_index(tracks, fn track, position ->
-          %{track_id: track.id, name: track.name, duration: track.duration, position: position}
-        end)
-
-      _not_loaded ->
-        []
     end
   end
 end

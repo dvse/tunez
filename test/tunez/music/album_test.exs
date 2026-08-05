@@ -19,24 +19,115 @@ defmodule TunezWeb.Music.AlbumTest do
       assert album.updated_by_id == actor.id
     end
 
-    test "creates and sends notifications for followers of the album's artist" do
+    test "fans out one notification per follower through the queue trigger" do
       artist = generate(artist())
       actor = generate(user(role: :admin))
-      [%{id: follower_id} = follower, _nonfollower] = generate_many(user(), 2)
-      Music.follow_artist!(artist, actor: follower)
+      followers = generate_many(user(), 3)
+      _nonfollower = generate(user())
 
-      %{id: album_id} =
+      Enum.each(followers, &Music.follow_artist!(artist, actor: &1))
+
+      album =
         Music.create_album!(
           %{name: "New Album", artist_id: artist.id, year_released: 2024},
           actor: actor
         )
 
-      notifications = Ash.read!(Notification, authorize?: false)
-      assert length(notifications) == 1
-      notification = hd(notifications)
+      assert [] = Ash.read!(Notification, authorize?: false)
 
-      assert notification.user_id == follower_id
-      assert notification.album_id == album_id
+      assert album =
+               AshQueue.Test.assert_would_schedule(album, :fan_out_album_release_notifications)
+
+      assert [_job] = AshQueue.Test.assert_triggered(album, :fan_out_album_release_notifications)
+
+      assert {:ok, %{success: 1}} =
+               AshQueue.Test.drain_queue(Tunez.Music, queue: :album_notifications)
+
+      notifications = Ash.read!(Notification, authorize?: false)
+
+      assert Enum.sort(Enum.map(notifications, & &1.user_id)) ==
+               Enum.sort(Enum.map(followers, & &1.id))
+
+      assert Enum.all?(notifications, &(&1.album_id == album.id))
+
+      assert :ok =
+               AshQueue.Test.refute_would_schedule(album, :fan_out_album_release_notifications)
+    end
+
+    test "the fan-out worker is structurally idempotent" do
+      artist = generate(artist())
+      actor = generate(user(role: :admin))
+      followers = generate_many(user(), 3)
+      Enum.each(followers, &Music.follow_artist!(artist, actor: &1))
+
+      album =
+        Music.create_album!(
+          %{name: "Idempotent Album", artist_id: artist.id, year_released: 2024},
+          actor: actor
+        )
+
+      for _run <- 1..2 do
+        Ash.update!(album, %{},
+          action: :fan_out_album_release_notifications,
+          context: %{private: %{ash_queue?: true}},
+          authorize?: true
+        )
+      end
+
+      notifications = Ash.read!(Notification, authorize?: false)
+      assert length(notifications) == length(followers)
+      assert Enum.uniq_by(notifications, &{&1.album_id, &1.user_id}) == notifications
+    end
+
+    test "the template heals a follower added after the first fan-out" do
+      artist = generate(artist())
+      actor = generate(user(role: :admin))
+      first_follower = generate(user())
+      Music.follow_artist!(artist, actor: first_follower)
+
+      album =
+        Music.create_album!(
+          %{name: "Healing Album", artist_id: artist.id, year_released: 2024},
+          actor: actor
+        )
+
+      assert {:ok, %{success: 1}} =
+               AshQueue.Test.drain_queue(Tunez.Music, queue: :album_notifications)
+
+      assert :ok =
+               AshQueue.Test.refute_would_schedule(album, :fan_out_album_release_notifications)
+
+      late_follower = generate(user())
+      Music.follow_artist!(artist, actor: late_follower)
+
+      assert album =
+               AshQueue.Test.assert_would_schedule(album, :fan_out_album_release_notifications)
+
+      assert {:ok, _job} = AshQueue.Test.wake(album, :fan_out_album_release_notifications)
+
+      assert {:ok, %{success: 1}} =
+               AshQueue.Test.drain_queue(Tunez.Music, queue: :album_notifications)
+
+      notifications = Ash.read!(Notification, authorize?: false)
+
+      assert Enum.sort(Enum.map(notifications, & &1.user_id)) ==
+               Enum.sort([first_follower.id, late_follower.id])
+    end
+
+    test "album creation does not write notifications inline" do
+      artist = generate(artist())
+      actor = generate(user(role: :admin))
+      follower = generate(user())
+      Music.follow_artist!(artist, actor: follower)
+
+      album =
+        Music.create_album!(
+          %{name: "Queued Album", artist_id: artist.id, year_released: 2024},
+          actor: actor
+        )
+
+      assert [] = Ash.read!(Notification, authorize?: false)
+      assert [_job] = AshQueue.Test.assert_triggered(album, :fan_out_album_release_notifications)
     end
   end
 

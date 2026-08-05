@@ -2,11 +2,11 @@ defmodule Tunez.UI.FormControl do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: :embedded,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   policies do
-    policy action_type(:create) do
+    policy always() do
       authorize_if always()
     end
   end
@@ -37,7 +37,10 @@ defmodule Tunez.UI.FormControl do
                   if is_nil(error) or error == "" do
                     nothing()
                   else
-                    paragraph(:field_error, [], [inline(:field_error_icon, [], []), text(error)])
+                    paragraph(:field_error, [], [
+                      inline(:field_error_icon, [data: %{icon: "error"}], []),
+                      text(error)
+                    ])
                   end
                 ])
               )

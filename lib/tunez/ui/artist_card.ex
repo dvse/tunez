@@ -2,11 +2,11 @@ defmodule Tunez.UI.ArtistCard do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: :embedded,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   policies do
-    policy action_type(:create) do
+    policy always() do
       authorize_if always()
     end
   end
@@ -28,7 +28,7 @@ defmodule Tunez.UI.ArtistCard do
                 box(:artist_card_image, [dom_id: "artist-" <> id, data: [role: "artist-card"]], [
                   link(:cover_link, [to: "/artists/" <> id], [
                     if followed? do
-                      inline(:followed_icon, [], [])
+                      inline(:followed_icon, [data: %{icon: "star-full"}], [])
                     else
                       nothing()
                     end,
@@ -41,7 +41,7 @@ defmodule Tunez.UI.ArtistCard do
                   ]),
                   if follower_count > 0 do
                     inline(:follower_count, [data: [role: "follower-count"]], [
-                      inline(:follower_count_icon, [], []),
+                      inline(:follower_count_icon, [data: %{icon: "star"}], []),
                       text(" "),
                       text(
                         if follower_count >= 1_000_000 do

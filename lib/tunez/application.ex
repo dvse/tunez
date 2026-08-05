@@ -7,21 +7,32 @@ defmodule Tunez.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      TunezWeb.Telemetry,
-      Tunez.Repo,
-      {DNSCluster, query: Application.get_env(:tunez, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Tunez.PubSub},
-      # Start the Finch HTTP client for sending emails
-      {Finch, name: Tunez.Finch},
-      # Start a worker by calling: Tunez.Worker.start_link(arg)
-      # {Tunez.Worker, arg},
-      # Start to serve requests, typically the last entry
-      TunezWeb.Endpoint,
-      {Absinthe.Subscription, TunezWeb.Endpoint},
-      AshGraphql.Subscription.Batcher,
-      {AshAuthentication.Supervisor, [otp_app: :tunez]}
-    ]
+    queue_children =
+      if Application.get_env(:tunez, :start_ash_queue?, true) do
+        [{AshQueue, domain: Tunez.Music}]
+      else
+        []
+      end
+
+    children =
+      [
+        TunezWeb.Telemetry,
+        Tunez.Repo
+      ] ++
+        queue_children ++
+        [
+          {DNSCluster, query: Application.get_env(:tunez, :dns_cluster_query) || :ignore},
+          {Phoenix.PubSub, name: Tunez.PubSub},
+          # Start the Finch HTTP client for sending emails
+          {Finch, name: Tunez.Finch},
+          # Start a worker by calling: Tunez.Worker.start_link(arg)
+          # {Tunez.Worker, arg},
+          # Start to serve requests, typically the last entry
+          TunezWeb.Endpoint,
+          {Absinthe.Subscription, TunezWeb.Endpoint},
+          AshGraphql.Subscription.Batcher,
+          {AshAuthentication.Supervisor, [otp_app: :tunez]}
+        ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

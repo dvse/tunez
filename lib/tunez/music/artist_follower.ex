@@ -63,6 +63,24 @@ defmodule Tunez.Music.ArtistFollower do
       pagination keyset?: true, required?: false
     end
 
+    read :missing_album_notifications do
+      argument :artist_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :album_id, :uuid do
+        allow_nil? false
+      end
+
+      filter expr(
+               artist_id == ^arg(:artist_id) and
+                 not exists(
+                   Tunez.Accounts.Notification,
+                   album_id == ^arg(:album_id) and user_id == parent(follower_id)
+                 )
+             )
+    end
+
     create :create do
       accept [:artist_id]
       change relate_actor(:follower, allow_nil?: false)

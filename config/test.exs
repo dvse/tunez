@@ -1,6 +1,7 @@
 import Config
 config :tunez, token_signing_secret: "P4Po/plO7vboF7jixqPjpuX+vFA+Rr7j"
 config :tunez, mcp_upload_roots: [Path.join(System.tmp_dir!(), "tunez-mcp-upload-tests")]
+config :tunez, start_ash_queue?: false
 config :bcrypt_elixir, log_rounds: 1
 config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
 

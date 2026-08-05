@@ -185,7 +185,19 @@ defmodule Tunez.Music.Artist do
 
     update :update do
       accept [:name, :biography]
-      change Tunez.Music.Changes.UpdatePreviousNames
+
+      change atomic_update(
+               :previous_names,
+               expr(
+                 fragment(
+                   "array_remove(array_prepend(?, ?), ?)",
+                   name,
+                   previous_names,
+                   ^atomic_ref(:name)
+                 )
+               ),
+               cast_atomic?: false
+             )
     end
 
     update :follow do

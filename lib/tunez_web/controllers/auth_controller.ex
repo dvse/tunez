@@ -85,7 +85,7 @@ defmodule TunezWeb.AuthController do
   defp put_session_flash(conn, level, message) do
     case get_session(conn, "ash_blueprint_session_id") do
       session_id when is_binary(session_id) ->
-        {:ok, _flash} = Tunez.UI.put_flash(session_id, level, message, %{carry?: true}, authorize?: false)
+        {:ok, _flash} = Tunez.UI.put_flash(session_id, level, message, %{carry?: true})
         conn
 
       _missing ->

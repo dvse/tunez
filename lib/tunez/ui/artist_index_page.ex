@@ -2,32 +2,18 @@ defmodule Tunez.UI.ArtistIndexPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
-
-  # The sort vocabulary — ONE source for the attribute constraint, the
-  # select options, and the mount whitelist. Values are upstream
-  # sort_input strings.
-  @sort_options [
-    {"recently updated", "-updated_at"},
-    {"recently added", "-inserted_at"},
-    {"name", "name"},
-    {"number of albums", "-album_count"},
-    {"latest album release", "--latest_album_year_released"},
-    {"popularity", "-follower_count"},
-    {"followed artists first", "-followed_by_me"}
-  ]
-
-  @sort_option_maps Enum.map(@sort_options, fn {label, value} ->
-                      %{label: label, value: value}
-                    end)
 
   ets do
     private? false
   end
 
   ash_blueprint do
-    stylesheets ["priv/static/assets/app.css"]
+    stylesheets([
+      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/assets/app.css"
+    ])
   end
 
   routes do
@@ -47,6 +33,7 @@ defmodule Tunez.UI.ArtistIndexPage do
 
   attributes do
     attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
+    attribute :page_title, :string, allow_nil?: false, default: "Artists", public?: true
 
     attribute :q, :string,
       allow_nil?: false,
@@ -59,7 +46,15 @@ defmodule Tunez.UI.ArtistIndexPage do
       default :"-updated_at"
       public? true
 
-      constraints one_of: Enum.map(@sort_options, fn {_label, value} -> String.to_atom(value) end)
+      constraints one_of: [
+                    :"-updated_at",
+                    :"-inserted_at",
+                    :name,
+                    :"-album_count",
+                    :"--latest_album_year_released",
+                    :"-follower_count",
+                    :"-followed_by_me"
+                  ]
     end
 
     attribute :limit, :integer,
@@ -98,8 +93,6 @@ defmodule Tunez.UI.ArtistIndexPage do
   end
 
   calculations do
-    calculate :page_title, :string, expr("Artists"), public?: true
-
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -127,7 +120,21 @@ defmodule Tunez.UI.ArtistIndexPage do
                                 [dom_id: "sort_by", name: "sort_by"],
                                 [
                                   each(
-                                    @sort_option_maps,
+                                    [
+                                      %{label: "recently updated", value: "-updated_at"},
+                                      %{label: "recently added", value: "-inserted_at"},
+                                      %{label: "name", value: "name"},
+                                      %{label: "number of albums", value: "-album_count"},
+                                      %{
+                                        label: "latest album release",
+                                        value: "--latest_album_year_released"
+                                      },
+                                      %{label: "popularity", value: "-follower_count"},
+                                      %{
+                                        label: "followed artists first",
+                                        value: "-followed_by_me"
+                                      }
+                                    ],
                                     :sort_option,
                                     [key: sort_option.value],
                                     [
@@ -153,7 +160,7 @@ defmodule Tunez.UI.ArtistIndexPage do
                             on_submit: :search
                           ],
                           [
-                            inline(:search_icon, [], []),
+                            inline(:search_icon, [data: %{icon: "search"}], []),
                             render(Tunez.UI.FormControl, %{
                               label: "Search",
                               dom_id: "search-text",
@@ -181,7 +188,7 @@ defmodule Tunez.UI.ArtistIndexPage do
                     }),
                     if empty?(artists) do
                       box(:empty_state, [], [
-                        inline(:empty_icon, [], []),
+                        inline(:empty_icon, [data: %{icon: "circle-slash"}], []),
                         break(:line, [], []),
                         text(" No artist data to display!")
                       ])
@@ -255,12 +262,18 @@ defmodule Tunez.UI.ArtistIndexPage do
     create :mount do
       accept [:q, :limit, :offset]
       argument :sort_by, :string
-      change AshBlueprint.Changes.SetSessionId
-      change Tunez.UI.Changes.BeginPageLife
 
       change set_attribute(:sort_by, arg(:sort_by)),
         where: [
-          argument_in(:sort_by, Enum.map(@sort_options, fn {_label, value} -> value end))
+          argument_in(:sort_by, [
+            "-updated_at",
+            "-inserted_at",
+            "name",
+            "-album_count",
+            "--latest_album_year_released",
+            "-follower_count",
+            "-followed_by_me"
+          ])
         ]
     end
 

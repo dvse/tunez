@@ -1,6 +1,7 @@
 # Tunez audit-gate exceptions
 
-All workspace Ash and AshBlueprint rules apply. The following is the only approved deviation.
+All workspace Ash and AshBlueprint rules apply. The approved deviations are
+recorded below.
 
 ## Artist catalogue relationship
 
@@ -54,17 +55,56 @@ Cleanup condition: replace the callback with `atomic_set` when Ash exposes a
 public changeset-preview API that evaluates create atomics without persisting,
 and AshBlueprint uses that API for lazy store prototypes.
 
+## AshAuthentication confirmation token payload
+
+`Tunez.Accounts.Token.extra_data` and the extension-generated
+`:store_confirmation_changes` action may retain the locked AshAuthentication
+`Ash.Type.Map` contract. This is the sole accepted generic token payload. The
+four source-declared standard actions must not accept it: `:revoke_token`,
+`:revoke_jti`, and `:revoke_all_stored_for_subject` have `accept []`, while
+`:store_token` accepts only `:purpose`.
+
+Proof: AshAuthentication 4.14.1 creates `extra_data` as `:map` and rejects any
+attribute type other than `Ash.Type.Map`
+(`deps/ash_authentication/lib/ash_authentication/token_resource/transformer.ex:73-78,675-682`).
+It generates `:store_confirmation_changes` with
+`accept [:extra_data, :purpose]` (`transformer.ex:348-369`). Tunez's active
+confirmation strategy monitors only `:email`; the locked producer stores the
+monitored value as a string in `extra_data`, and the locked consumer reads it
+by the strategy's stringified field name
+(`deps/ash_authentication/lib/ash_authentication/add_ons/confirmation/actions.ex:67-150`).
+Token storage and revocation callers do not supply or consume `extra_data`, so
+their generator-copied accepts are removed.
+
+Ash's fixed `fields:` map constraint is not compatible with this locked
+contract: declared fields are atom-named and casting/loading rebuilds the map
+with those atom keys, while AshAuthentication reads persisted confirmation
+keys as strings (`deps/ash/lib/ash/type/map.ex:17-75,360-385,508-515`). With no
+`fields:` constraint the type validates only the root map and passes nested
+values through (`map.ex:276-292,336-401`). The exception is therefore limited
+to the policy-bypassed, server-side AshAuthentication interaction and its
+dependency-owned producer/consumer; Tunez code must not parse it or expose
+another action that accepts it.
+
+Cleanup condition: delete this exception if Tunez removes confirmation-token
+state. Otherwise replace it when AshAuthentication accepts a semantic custom
+type or exposes a typed confirmation-payload contract with canonical key
+semantics. Re-audit before adding another confirmation monitor field or an
+OAuth/OIDC strategy.
+
 
 ## Page-life clock
 
-`Tunez.UI.PageLife` is the session's navigation clock; every routed page's
-`:mount` declares `change Tunez.UI.Changes.BeginPageLife` (a reused change is
-justified: nine resources declare the identical lifecycle fact through the
-`Tunez.UI.begin_page_life/2` domain interface with full scope). Flash rows are
-stamped with the life they were put in; visibility is the pure comparison in
-`Tunez.UI.Flash.visible?`. Failure flashes are NOT rows: they are projections
-of the dispatch's fieldless errors (`errors()` in `Tunez.UI.FlashStack`),
-which gives them per-dispatch transience with zero lifecycle state.
+`Tunez.UI.PageLife` is the session's navigation clock. `Tunez.UI.Blueprint`
+declares the compile-verified
+`{Tunez.UI.PageLifeDomain, :begin_page_life}` contract once and AshBlueprint
+supplies it only to routed mounts. The small domain owns only that interface so
+the substrate can compile before the routed resources that `Tunez.UI` itself
+registers. Flash rows are stamped with the life they were put in; visibility is
+the pure comparison in `Tunez.UI.Flash.visible?`. Failure flashes are NOT rows:
+they are projections of the dispatch's fieldless errors (`errors()` in
+`Tunez.UI.FlashStack`), which gives them per-dispatch transience with zero
+lifecycle state.
 
 ## Album track materialization
 

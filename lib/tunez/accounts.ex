@@ -45,6 +45,18 @@ defmodule Tunez.Accounts do
     end
   end
 
+  tools do
+    tool :list_my_notifications, Tunez.Accounts.Notification, :for_user do
+      description """
+      List the authenticated user's album-release notifications. Takes no explicit input, does
+      not mutate state, and returns policy-visible notification records with album and artist
+      context ordered newest first.
+      """
+
+      load album: [:artist]
+    end
+  end
+
   resources do
     resource Tunez.Accounts.Token
 
@@ -54,6 +66,7 @@ defmodule Tunez.Accounts do
     end
 
     resource Tunez.Accounts.Notification do
+      define :create_album_release_notification, action: :create_for_album_release
       define :get_notification_by_id, action: :for_user, get_by: :id
       define :notifications_for_user, action: :for_user
       define :dismiss_notification, action: :destroy

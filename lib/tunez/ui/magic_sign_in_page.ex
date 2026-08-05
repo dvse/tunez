@@ -2,7 +2,7 @@ defmodule Tunez.UI.MagicSignInPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -10,7 +10,10 @@ defmodule Tunez.UI.MagicSignInPage do
   end
 
   ash_blueprint do
-    stylesheets ["priv/static/assets/app.css"]
+    stylesheets([
+      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/assets/app.css"
+    ])
   end
 
   routes do
@@ -33,6 +36,12 @@ defmodule Tunez.UI.MagicSignInPage do
   attributes do
     attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
     attribute :csrf_token, :string, allow_nil?: false, sensitive?: true, public?: false
+
+    attribute :page_title, :string,
+      allow_nil?: false,
+      default: "Finish signing in",
+      public?: true
+
     attribute :token, :string, allow_nil?: false, sensitive?: true, public?: true
   end
 
@@ -43,8 +52,6 @@ defmodule Tunez.UI.MagicSignInPage do
   end
 
   calculations do
-    calculate :page_title, :string, expr("Finish signing in"), public?: true
-
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -70,7 +77,7 @@ defmodule Tunez.UI.MagicSignInPage do
                           nothing()
                         else
                           paragraph(:field_error, [], [
-                            inline(:field_error_icon, [], []),
+                            inline(:field_error_icon, [data: %{icon: "error"}], []),
                             text(join(field_errors(:token), ", "))
                           ])
                         end,
@@ -95,8 +102,6 @@ defmodule Tunez.UI.MagicSignInPage do
       change set_attribute(:csrf_token, context(:csrf_token))
       argument :token, :string, allow_nil?: false
       change set_attribute(:token, arg(:token))
-      change AshBlueprint.Changes.SetSessionId
-      change Tunez.UI.Changes.BeginPageLife
     end
   end
 end

@@ -20,21 +20,17 @@ defmodule Tunez.Accounts.User.Senders.SendMagicLinkEmail do
         email -> email
       end
 
+    sign_in_url = url(~p"/magic_link/#{token}")
+
     new()
     # TODO: Replace with your email
     |> from({"noreply", "noreply@example.com"})
     |> to(to_string(email))
     |> subject("Your login link")
-    |> html_body(body(token: token, email: email))
+    |> html_body("""
+    <p>Hello, #{email}! Click this link to sign in:</p>
+    <p><a href="#{sign_in_url}">#{sign_in_url}</a></p>
+    """)
     |> Mailer.deliver!()
-  end
-
-  defp body(params) do
-    # NOTE: You may have to change this to match your magic link acceptance URL.
-
-    """
-    <p>Hello, #{params[:email]}! Click this link to sign in:</p>
-    <p><a href="#{url(~p"/magic_link/#{params[:token]}")}">#{url(~p"/magic_link/#{params[:token]}")}</a></p>
-    """
   end
 end

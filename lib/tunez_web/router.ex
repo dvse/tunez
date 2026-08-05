@@ -141,15 +141,13 @@ defmodule TunezWeb.Router do
   # datastar runtime; never the LiveView runtime.
   def datastar_document(%{content: content, record: record, script_path: script_path}) do
     page_title =
-      case Map.get(record, :page_title) do
-        title when is_binary(title) ->
+      case record do
+        %Tunez.UI.ArtistShowPage{artist: %Tunez.Music.Artist{name: title}}
+        when is_binary(title) ->
           title
 
-        %Ash.NotLoaded{} ->
-          case Ash.load(record, :page_title, authorize?: false) do
-            {:ok, %{page_title: title}} when is_binary(title) -> title
-            _other -> nil
-          end
+        %{page_title: title} when is_binary(title) ->
+          title
 
         _other ->
           nil
@@ -173,6 +171,26 @@ defmodule TunezWeb.Router do
   # classes over the shared skeleton so every rendered document (LiveView and
   # Datastar) carries identical html/body attributes.
   def app_document(assigns) do
+    assigns =
+      case assigns do
+        %{page_title: title} when is_binary(title) ->
+          assigns
+
+        %{
+          ash_blueprint_record: %Tunez.UI.ArtistShowPage{
+            artist: %Tunez.Music.Artist{name: title}
+          }
+        }
+        when is_binary(title) ->
+          Map.put(assigns, :page_title, title)
+
+        %{ash_blueprint_record: %{page_title: title}} when is_binary(title) ->
+          Map.put(assigns, :page_title, title)
+
+        _other ->
+          assigns
+      end
+
     {:safe, iodata} = AshBlueprint.Phoenix.RootLayout.render(assigns)
 
     html =

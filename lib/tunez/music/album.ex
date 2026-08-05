@@ -4,11 +4,36 @@ defmodule Tunez.Music.Album do
     domain: Tunez.Music,
     notifiers: [AshBlueprint.Notifier],
     data_layer: AshPostgres.DataLayer,
-    extensions: [AshGraphql.Resource, AshJsonApi.Resource, AshLua.Resource],
+    extensions: [AshQueue.Resource, AshGraphql.Resource, AshJsonApi.Resource, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   graphql do
     type :album
+  end
+
+  queue do
+    domain Tunez.Music
+    # Tunez has no multitenancy. Queue reads and jobs are domain-global.
+    use_tenant_from_record?(false)
+
+    transition :fan_out_album_release_notifications do
+      queue :album_notifications
+      actor_persister Tunez.QueueActorPersister
+      max_attempts 3
+      backoff :exponential
+      consumes_match?(true)
+
+      where expr(
+              exists(
+                Tunez.Music.ArtistFollower,
+                artist_id == parent(artist_id) and
+                  not exists(
+                    Tunez.Accounts.Notification,
+                    album_id == parent(parent(id)) and user_id == parent(follower_id)
+                  )
+              )
+            )
+    end
   end
 
   json_api do
@@ -26,6 +51,10 @@ defmodule Tunez.Music.Album do
   end
 
   policies do
+    bypass AshQueue.Checks.AshQueueInteraction do
+      authorize_if always()
+    end
+
     policy action(:manageable) do
       authorize_if actor_attribute_equals(:role, :admin)
       authorize_if expr(^actor(:role) == :editor and created_by_id == ^actor(:id))
@@ -40,7 +69,10 @@ defmodule Tunez.Music.Album do
     end
 
     policy action_type([:update, :destroy]) do
-      authorize_if expr(can_manage_album?)
+      authorize_if expr(
+                     ^actor(:role) == :admin or
+                       (^actor(:role) == :editor and created_by_id == ^actor(:id))
+                   )
     end
 
     policy action_type(:read) do
@@ -85,21 +117,10 @@ defmodule Tunez.Music.Album do
     belongs_to :updated_by, Tunez.Accounts.User
   end
 
-  calculations do
-    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes
-
-    calculate :can_manage_album?,
-              :boolean,
-              expr(
-                ^actor(:role) == :admin or
-                  (^actor(:role) == :editor and created_by_id == ^actor(:id))
-              )
-  end
-
-  def next_year, do: Date.utc_today().year + 1
-
   aggregates do
-    sum :duration_seconds, :tracks, :duration_seconds
+    sum :duration_seconds, :tracks, :duration_seconds do
+      public? true
+    end
   end
 
   identities do
@@ -108,19 +129,21 @@ defmodule Tunez.Music.Album do
   end
 
   changes do
-    change Tunez.Accounts.Changes.SendNewAlbumNotifications, on: [:create]
-
     change relate_actor(:created_by, allow_nil?: true), on: [:create]
     change relate_actor(:updated_by, allow_nil?: true)
   end
 
   validations do
-    validate numericality(:year_released,
-               greater_than: 1950,
-               less_than_or_equal_to: &__MODULE__.next_year/0
-             ),
-             where: [present(:year_released)],
-             message: "must be between 1950 and next year"
+    validate fn changeset, _context ->
+               year_released = Ash.Changeset.get_attribute(changeset, :year_released)
+
+               if year_released > 1950 and year_released <= Date.utc_today().year + 1 do
+                 :ok
+               else
+                 {:error, field: :year_released, message: "must be between 1950 and next year"}
+               end
+             end,
+             where: [present(:year_released)]
 
     validate match(:cover_image_url, ~r"^(https://|/images/).+(\.png|\.jpg)$"),
       where: [changing(:cover_image_url)],
@@ -137,14 +160,82 @@ defmodule Tunez.Music.Album do
 
     create :create do
       accept [:name, :year_released, :cover_image_url, :artist_id]
-      argument :tracks, {:array, :map}
+
+      argument :tracks, {:array, :map} do
+        constraints items: [
+                      fields: [
+                        id: [type: :uuid],
+                        order: [type: :integer, constraints: [min: 0]],
+                        name: [type: :string, allow_nil?: false],
+                        duration: [type: :string, allow_nil?: false]
+                      ]
+                    ]
+      end
+
       change manage_relationship(:tracks, type: :direct_control, order_is_key: :order)
+    end
+
+    update :fan_out_album_release_notifications do
+      public? false
+      accept []
+      require_atomic? false
+
+      change fn changeset, context ->
+        Ash.Changeset.before_action(changeset, fn changeset ->
+          inputs =
+            changeset.data.artist_id
+            |> Tunez.Music.missing_notification_followers_for_album!(
+              changeset.data.id,
+              scope: context
+            )
+            |> Enum.map(fn follower ->
+              %{album_id: changeset.data.id, user_id: follower.follower_id}
+            end)
+
+          case Ash.bulk_create(
+                 inputs,
+                 Tunez.Accounts.Notification,
+                 :create_for_album_release,
+                 domain: Tunez.Accounts,
+                 scope: context,
+                 context: context.source_context,
+                 authorize?: true,
+                 transaction: false,
+                 notify?: true,
+                 return_errors?: true,
+                 stop_on_error?: true
+               ) do
+            %Ash.BulkResult{status: :success} ->
+              changeset
+
+            %Ash.BulkResult{errors: [error | _errors]} ->
+              Ash.Changeset.add_error(changeset, error)
+
+            result ->
+              Ash.Changeset.add_error(
+                changeset,
+                "notification fan-out failed: #{inspect(result)}"
+              )
+          end
+        end)
+      end
     end
 
     update :update do
       accept [:name, :year_released, :cover_image_url]
       require_atomic? false
-      argument :tracks, {:array, :map}
+
+      argument :tracks, {:array, :map} do
+        constraints items: [
+                      fields: [
+                        id: [type: :uuid],
+                        order: [type: :integer, constraints: [min: 0]],
+                        name: [type: :string, allow_nil?: false],
+                        duration: [type: :string, allow_nil?: false]
+                      ]
+                    ]
+      end
+
       change manage_relationship(:tracks, type: :direct_control, order_is_key: :order)
     end
 

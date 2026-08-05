@@ -2,7 +2,7 @@ defmodule Tunez.UI.NotificationsPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -38,7 +38,7 @@ defmodule Tunez.UI.NotificationsPage do
                       :notifications_toggle,
                       [tabindex: 0, on_click: :toggle, on_click_away: :close],
                       [
-                        inline(:notifications_bell_icon, [], []),
+                        inline(:notifications_bell_icon, [data: %{icon: "bell-dot"}], []),
                         if empty?(notifications) do
                           nothing()
                         else
@@ -58,7 +58,11 @@ defmodule Tunez.UI.NotificationsPage do
                       [
                         if empty?(notifications) do
                           box(:notifications_empty, [], [
-                            inline(:notifications_empty_icon, [], []),
+                            inline(
+                              :notifications_empty_icon,
+                              [data: %{icon: "pass-filled"}],
+                              []
+                            ),
                             inline(:notifications_empty_text, [], [text("No new notifications!")])
                           ])
                         else
@@ -126,7 +130,6 @@ defmodule Tunez.UI.NotificationsPage do
     end
 
     create :mount do
-      change AshBlueprint.Changes.SetSessionId
     end
 
     update :toggle do

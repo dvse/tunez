@@ -2,7 +2,7 @@ defmodule Tunez.UI.ArtistFormPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -10,7 +10,10 @@ defmodule Tunez.UI.ArtistFormPage do
   end
 
   ash_blueprint do
-    stylesheets ["priv/static/assets/app.css"]
+    stylesheets([
+      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/assets/app.css"
+    ])
   end
 
   routes do
@@ -42,6 +45,7 @@ defmodule Tunez.UI.ArtistFormPage do
     attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
     attribute :subject_id, :string, allow_nil?: false, primary_key?: true, public?: false
     attribute :artist_id, :uuid, public?: true
+    attribute :page_title, :string, allow_nil?: false, default: "New Artist", public?: true
 
     attribute :name, :string,
       allow_nil?: false,
@@ -75,11 +79,6 @@ defmodule Tunez.UI.ArtistFormPage do
   end
 
   calculations do
-    calculate :page_title,
-              :string,
-              expr(if(is_nil(artist_id), do: "New Artist", else: "Update Artist")),
-              public?: true
-
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -167,12 +166,11 @@ defmodule Tunez.UI.ArtistFormPage do
       # editable attributes untouched, preserving in-progress input.
       upsert? true
       upsert_identity :session_instance
-      upsert_fields [:artist_id, :saved_artist_id]
+      upsert_fields [:artist_id, :saved_artist_id, :page_title]
 
       argument :artist_id, :uuid
-      change AshBlueprint.Changes.SetSessionId
-      change Tunez.UI.Changes.BeginPageLife
       change set_attribute(:artist_id, arg(:artist_id))
+      change set_attribute(:page_title, "Update Artist"), where: [present(:artist_id)]
 
       change fn changeset, _context ->
         subject_id = Ash.Changeset.get_argument(changeset, :artist_id) || "new"

@@ -38,6 +38,12 @@ defmodule TunezWeb.Endpoint do
     gzip: false,
     only: ~w(assets)
 
+  plug Plug.Static,
+    at: "/app_domain_workbench/priv/theme",
+    from: Path.expand("../../../app_domain_workbench/priv/theme", __DIR__),
+    gzip: false,
+    only: ~w(styles fonts)
+
   plug AshBlueprint.Phoenix.Assets
 
   # Code reloading can be explicitly enabled under the

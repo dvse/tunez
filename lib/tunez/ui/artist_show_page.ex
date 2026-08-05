@@ -2,7 +2,7 @@ defmodule Tunez.UI.ArtistShowPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -10,7 +10,10 @@ defmodule Tunez.UI.ArtistShowPage do
   end
 
   ash_blueprint do
-    stylesheets ["priv/static/assets/app.css"]
+    stylesheets([
+      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/assets/app.css"
+    ])
   end
 
   routes do
@@ -61,8 +64,6 @@ defmodule Tunez.UI.ArtistShowPage do
   end
 
   calculations do
-    calculate :page_title, :string, expr(artist.name), public?: true
-
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -87,7 +88,11 @@ defmodule Tunez.UI.ArtistShowPage do
                                   action_input: %{artist_id: artist.id}
                                 ],
                                 [
-                                  inline(:follow_toggle_icon, [state: [selected: true]], [])
+                                  inline(
+                                    :follow_toggle_icon,
+                                    [state: [selected: true], data: %{icon: "star-full"}],
+                                    []
+                                  )
                                 ]
                               )
                             else
@@ -98,7 +103,11 @@ defmodule Tunez.UI.ArtistShowPage do
                                   action_input: %{artist_id: artist.id}
                                 ],
                                 [
-                                  inline(:follow_toggle_icon, [state: [selected: false]], [])
+                                  inline(
+                                    :follow_toggle_icon,
+                                    [state: [selected: false], data: %{icon: "star"}],
+                                    []
+                                  )
                                 ]
                               )
                             end
@@ -186,16 +195,34 @@ defmodule Tunez.UI.ArtistShowPage do
                                         " (" <> to_string(album.year_released) <> ")"
                                     ),
                                     text(" "),
-                                    if is_nil(album.duration) do
+                                    if is_nil(album.duration_seconds) do
                                       nothing()
                                     else
                                       inline(:album_duration, [], [
-                                        text("(" <> album.duration <> ")")
+                                        text(
+                                          "(" <>
+                                            to_string(
+                                              round(
+                                                (album.duration_seconds -
+                                                   rem(album.duration_seconds, 60)) /
+                                                  60
+                                              )
+                                            ) <>
+                                            ":" <>
+                                            if rem(album.duration_seconds, 60) < 10 do
+                                              "0" <> to_string(rem(album.duration_seconds, 60))
+                                            else
+                                              to_string(rem(album.duration_seconds, 60))
+                                            end <>
+                                            ")"
+                                        )
                                       ])
                                     end
                                   ]),
                                 actions:
-                                  if album.can_manage_album? do
+                                  if ^actor(:role) == :admin or
+                                       (^actor(:role) == :editor and
+                                          album.created_by_id == ^actor(:id)) do
                                     [
                                       link(
                                         :error_link_small,
@@ -224,7 +251,7 @@ defmodule Tunez.UI.ArtistShowPage do
                               }),
                               if empty?(album.tracks) do
                                 box(:tracks_empty, [], [
-                                  inline(:tracks_empty_icon, [], []),
+                                  inline(:tracks_empty_icon, [data: %{icon: "clock"}], []),
                                   text(" Track data coming soon....")
                                 ])
                               else
@@ -234,13 +261,29 @@ defmodule Tunez.UI.ArtistShowPage do
                                       row(:track_row, [], [
                                         header_cell(:track_number, [], [
                                           text(
-                                            if track.number < 10,
-                                              do: "0" <> to_string(track.number) <> ".",
-                                              else: to_string(track.number) <> "."
+                                            if track.order + 1 < 10,
+                                              do: "0" <> to_string(track.order + 1) <> ".",
+                                              else: to_string(track.order + 1) <> "."
                                           )
                                         ]),
                                         cell(:track_name, [], [text(track.name)]),
-                                        cell(:track_duration, [], [text(track.duration)])
+                                        cell(:track_duration, [], [
+                                          text(
+                                            to_string(
+                                              round(
+                                                (track.duration_seconds -
+                                                   rem(track.duration_seconds, 60)) /
+                                                  60
+                                              )
+                                            ) <>
+                                              ":" <>
+                                              if rem(track.duration_seconds, 60) < 10 do
+                                                "0" <> to_string(rem(track.duration_seconds, 60))
+                                              else
+                                                to_string(rem(track.duration_seconds, 60))
+                                              end
+                                          )
+                                        ])
                                       ])
                                     ])
                                   ])
@@ -276,8 +319,6 @@ defmodule Tunez.UI.ArtistShowPage do
 
     create :mount do
       argument :artist_id, :uuid, allow_nil?: false
-      change AshBlueprint.Changes.SetSessionId
-      change Tunez.UI.Changes.BeginPageLife
       change set_attribute(:artist_id, arg(:artist_id))
       change set_attribute(:deleted?, false)
     end

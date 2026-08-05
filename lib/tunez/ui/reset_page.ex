@@ -2,7 +2,7 @@ defmodule Tunez.UI.ResetPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, AshLua.Resource],
+    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -10,7 +10,10 @@ defmodule Tunez.UI.ResetPage do
   end
 
   ash_blueprint do
-    stylesheets ["priv/static/assets/app.css"]
+    stylesheets([
+      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/assets/app.css"
+    ])
   end
 
   routes do
@@ -30,6 +33,12 @@ defmodule Tunez.UI.ResetPage do
   attributes do
     attribute :session_id, :uuid, allow_nil?: false, primary_key?: true, public?: false
     attribute :csrf_token, :string, allow_nil?: false, sensitive?: true, public?: false
+
+    attribute :page_title, :string,
+      allow_nil?: false,
+      default: "Reset password",
+      public?: true
+
     attribute :token, :string, sensitive?: true, public?: true
     attribute :email, :string, constraints: [allow_empty?: true]
 
@@ -49,11 +58,6 @@ defmodule Tunez.UI.ResetPage do
   end
 
   calculations do
-    calculate :page_title,
-              :string,
-              expr(if(is_nil(token), do: "Reset password", else: "Choose a new password")),
-              public?: true
-
     calculate :view,
               AshBlueprint.Type.RenderTree,
               expr(
@@ -191,8 +195,7 @@ defmodule Tunez.UI.ResetPage do
       change set_attribute(:csrf_token, context(:csrf_token))
       argument :token, :string
       change set_attribute(:token, arg(:token))
-      change AshBlueprint.Changes.SetSessionId
-      change Tunez.UI.Changes.BeginPageLife
+      change set_attribute(:page_title, "Choose a new password"), where: [present(:token)]
     end
 
     update :edit do

@@ -12,7 +12,7 @@ defmodule TunezWeb.CoreComponents do
   See the [Tailwind CSS documentation](https://tailwindcss.com) to learn
   how to customize them or feel free to swap in another framework altogether.
 
-  Icons are provided by [heroicons](https://heroicons.com). See `icon/1` for usage.
+  Icons use the shared Workbench Codicon stylesheet.
   """
   use Phoenix.Component
   use TunezWeb, :verified_routes
@@ -48,7 +48,11 @@ defmodule TunezWeb.CoreComponents do
       <img src={@image} class="block aspect-square rounded-md w-full" />
     <% else %>
       <div class="border border-gray-300 place-content-center grid rounded-md aspect-square">
-        <.icon name="hero-photo" class="bg-gray-300 w-8 h-8" />
+        <span
+          part="missing_cover_icon"
+          data-icon="file-media"
+          class="inline-flex items-center justify-center text-gray-300 w-8 h-8 text-[2rem]"
+        />
       </div>
     <% end %>
     """
@@ -332,7 +336,7 @@ defmodule TunezWeb.CoreComponents do
 
   def form_input_styles do
     [
-      "my-2 block w-full rounded-lg text-zinc-900 focus:ring focus:outline-none sm:leading-6",
+      "my-2 block w-full rounded-lg border bg-white px-3 py-2 text-zinc-900 focus:ring focus:outline-none sm:leading-6",
       "border-zinc-300 focus:border-zinc-400 focus:ring-zinc-100",
       "error:border-error-400 error:focus:border-error-600 error:focus:ring-error-100",
       "disabled:bg-gray-100 disabled:text-zinc-400"
@@ -373,7 +377,11 @@ defmodule TunezWeb.CoreComponents do
   def error(assigns) do
     ~H"""
     <p class="mt-1.5 flex gap-1.5 text-sm leading-6 text-error-600 items-center">
-      <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-5 w-5 flex-none" />
+      <span
+        part="field_error_icon"
+        data-icon="error"
+        class="inline-flex items-center justify-center mt-0.5 h-5 w-5 flex-none text-xl"
+      />
       {render_slot(@inner_block)}
     </p>
     """
@@ -422,7 +430,11 @@ defmodule TunezWeb.CoreComponents do
           phx-click={toggle("##{@dropdown_id}")}
           phx-click-away={hide("##{@dropdown_id}")}
         >
-          <.icon name="hero-chevron-double-down w-4 h-4" />
+          <span
+            part="page_header_toggle_icon"
+            data-icon="chevron-down"
+            class="inline-flex items-center justify-center w-4 h-4"
+          />
         </div>
         <div
           id={@dropdown_id}
@@ -442,33 +454,6 @@ defmodule TunezWeb.CoreComponents do
         </div>
       </div>
     </header>
-    """
-  end
-
-  @doc """
-  Renders a [Heroicon](https://heroicons.com).
-
-  Heroicons come in three styles – outline, solid, and mini.
-  By default, the outline style is used, but solid and mini may
-  be applied by using the `-solid` and `-mini` suffix.
-
-  You can customize the size and colors of the icons by setting
-  width, height, and background color classes.
-
-  Icons are extracted from the `deps/heroicons` directory and bundled within
-  your compiled app.css by the plugin in your `assets/tailwind.config.js`.
-
-  ## Examples
-
-      <.icon name="hero-x-mark-solid" />
-      <.icon name="hero-arrow-path" class="ml-1 w-3 h-3 animate-spin" />
-  """
-  attr :name, :string, required: true
-  attr :class, :string, default: nil
-
-  def icon(%{name: "hero-" <> _} = assigns) do
-    ~H"""
-    <span class={[@name, @class]} />
     """
   end
 

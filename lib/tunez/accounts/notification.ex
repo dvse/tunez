@@ -2,11 +2,10 @@ defmodule Tunez.Accounts.Notification do
   use Ash.Resource,
     otp_app: :tunez,
     domain: Tunez.Accounts,
-    notifiers: [AshBlueprint.Notifier],
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshLua.Resource],
-    notifiers: [Ash.Notifier.PubSub]
+    notifiers: [AshBlueprint.Notifier, Ash.Notifier.PubSub]
 
   postgres do
     table "notifications"
@@ -19,11 +18,22 @@ defmodule Tunez.Accounts.Notification do
   end
 
   policies do
+    bypass AshQueue.Checks.AshQueueInteraction do
+      authorize_if always()
+    end
+
     policy action(:read) do
-      authorize_if expr(album.can_manage_album?)
+      authorize_if expr(
+                     ^actor(:role) == :admin or
+                       (^actor(:role) == :editor and album.created_by_id == ^actor(:id))
+                   )
     end
 
     policy action(:create) do
+      forbid_if always()
+    end
+
+    policy action(:create_for_album_release) do
       forbid_if always()
     end
 
@@ -32,7 +42,11 @@ defmodule Tunez.Accounts.Notification do
     end
 
     policy action(:destroy) do
-      authorize_if expr(album.can_manage_album?)
+      authorize_if expr(
+                     ^actor(:role) == :admin or
+                       (^actor(:role) == :editor and album.created_by_id == ^actor(:id))
+                   )
+
       authorize_if relates_to_actor_via(:user)
     end
   end
@@ -53,6 +67,10 @@ defmodule Tunez.Accounts.Notification do
     end
   end
 
+  identities do
+    identity :one_per_album_follower, [:album_id, :user_id]
+  end
+
   pub_sub do
     prefix "notifications"
     module TunezWeb.Endpoint
@@ -62,6 +80,7 @@ defmodule Tunez.Accounts.Notification do
     end
 
     publish :create, [:user_id]
+    publish :create_for_album_release, [:user_id]
     publish :destroy, [:user_id]
   end
 
@@ -70,6 +89,14 @@ defmodule Tunez.Accounts.Notification do
 
     create :create do
       accept [:user_id, :album_id]
+    end
+
+    create :create_for_album_release do
+      public? false
+      accept [:user_id, :album_id]
+      upsert? true
+      upsert_identity :one_per_album_follower
+      upsert_fields []
     end
 
     read :for_user do
