@@ -46,6 +46,8 @@ defmodule Tunez.UI do
     namespace "ui.artist_show_page" do
       action :for_session, Tunez.UI.ArtistShowPage, :for_session
       action :mount, Tunez.UI.ArtistShowPage, :mount
+      action :follow_artist, Tunez.UI.ArtistShowPage, :follow_artist
+      action :unfollow_artist, Tunez.UI.ArtistShowPage, :unfollow_artist
       action :destroy_album, Tunez.UI.ArtistShowPage, :destroy_album
       action :destroy_artist, Tunez.UI.ArtistShowPage, :destroy_artist
     end

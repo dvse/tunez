@@ -29,6 +29,10 @@ defmodule Tunez.UI.ArtistShowPage do
       authorize_if actor_present()
     end
 
+    policy action([:follow_artist, :unfollow_artist]) do
+      authorize_if actor_present()
+    end
+
     policy action(:destroy_artist) do
       authorize_if actor_attribute_equals(:role, :admin)
     end
@@ -54,12 +58,6 @@ defmodule Tunez.UI.ArtistShowPage do
       destination_attribute :id
       public? true
     end
-
-    has_many :artists, Tunez.Music.Artist do
-      source_attribute :artist_id
-      destination_attribute :id
-      public? true
-    end
   end
 
   calculations do
@@ -81,17 +79,29 @@ defmodule Tunez.UI.ArtistShowPage do
                           if is_nil(^actor(:id)) do
                             nothing()
                           else
-                            each(artists, :artist, [key: artist.id], [
-                              if artist.followed_by_me do
-                                inline(:follow_toggle, [on_click: {artist, :unfollow}], [
+                            if artist.followed_by_me do
+                              inline(
+                                :follow_toggle,
+                                [
+                                  on_click: :unfollow_artist,
+                                  action_input: %{artist_id: artist.id}
+                                ],
+                                [
                                   inline(:follow_toggle_icon, [state: [selected: true]], [])
-                                ])
-                              else
-                                inline(:follow_toggle, [on_click: {artist, :follow}], [
+                                ]
+                              )
+                            else
+                              inline(
+                                :follow_toggle,
+                                [
+                                  on_click: :follow_artist,
+                                  action_input: %{artist_id: artist.id}
+                                ],
+                                [
                                   inline(:follow_toggle_icon, [state: [selected: false]], [])
-                                ])
-                              end
-                            ])
+                                ]
+                              )
+                            end
                           end
                         ]),
                       subtitle:
@@ -270,6 +280,46 @@ defmodule Tunez.UI.ArtistShowPage do
       change Tunez.UI.Changes.BeginPageLife
       change set_attribute(:artist_id, arg(:artist_id))
       change set_attribute(:deleted?, false)
+    end
+
+    update :follow_artist do
+      require_atomic? false
+      argument :artist_id, :uuid, allow_nil?: false, public?: true
+      change filter(expr(artist_id == ^arg(:artist_id)))
+
+      change fn changeset, context ->
+        Ash.Changeset.before_action(changeset, fn changeset ->
+          with {:ok, _artist} <-
+                 Tunez.Music.follow_artist_by_id(
+                   Ash.Changeset.get_argument(changeset, :artist_id),
+                   scope: context
+                 ) do
+            changeset
+          else
+            {:error, error} -> Ash.Changeset.add_error(changeset, error)
+          end
+        end)
+      end
+    end
+
+    update :unfollow_artist do
+      require_atomic? false
+      argument :artist_id, :uuid, allow_nil?: false, public?: true
+      change filter(expr(artist_id == ^arg(:artist_id)))
+
+      change fn changeset, context ->
+        Ash.Changeset.before_action(changeset, fn changeset ->
+          with {:ok, _artist} <-
+                 Tunez.Music.unfollow_artist_by_id(
+                   Ash.Changeset.get_argument(changeset, :artist_id),
+                   scope: context
+                 ) do
+            changeset
+          else
+            {:error, error} -> Ash.Changeset.add_error(changeset, error)
+          end
+        end)
+      end
     end
 
     update :destroy_album do

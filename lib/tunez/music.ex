@@ -109,6 +109,8 @@ defmodule Tunez.Music do
 
       define :get_artist_by_id, action: :read, get_by: :id
       define :update_artist, action: :update
+      define :follow_artist_by_id, action: :follow, get_by: :id
+      define :unfollow_artist_by_id, action: :unfollow, get_by: :id
       define :destroy_artist, action: :destroy
     end
 
