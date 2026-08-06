@@ -422,6 +422,7 @@ defmodule Tunez.HTMLParity do
           }
 
           function removeObsoleteOracleArtifacts(document) {
+            // "flash-error" is the UPSTREAM book app's own dom id, not ours
             const saveError = document.getElementById("flash-error");
             const message = saveError?.textContent.trim().replace(/\s+/g, " ");
 
@@ -471,7 +472,7 @@ defmodule Tunez.HTMLParity do
       tag == "input" and Enum.member?(attrs, {"type", "hidden"}) ->
         nil
 
-      obsolete_upstream_save_flash?(tag, attrs, children) ->
+      obsolete_upstream_save_notice?(tag, attrs, children) ->
         nil
 
       tag == "label" and phoenix_form_label_noise?(attrs, children) ->
@@ -500,7 +501,8 @@ defmodule Tunez.HTMLParity do
   # The Ash UI keeps the original action/changeset errors as its sole error
   # model. The upstream Phoenix forms add this generic second error alongside
   # the useful field error; ignore only that exact obsolete oracle artifact.
-  defp obsolete_upstream_save_flash?("div", attrs, children) do
+  # The matched dom id belongs to the upstream book app's markup.
+  defp obsolete_upstream_save_notice?("div", attrs, children) do
     Enum.member?(attrs, {"id", "flash-error"}) and
       children
       |> Floki.text()
@@ -508,7 +510,7 @@ defmodule Tunez.HTMLParity do
       |> then(&(&1 in ["Could not save album data", "Could not save artist data"]))
   end
 
-  defp obsolete_upstream_save_flash?(_tag, _attrs, _children), do: false
+  defp obsolete_upstream_save_notice?(_tag, _attrs, _children), do: false
 
   # URL-link paging (upstream) and action paging (blueprint) are the same
   # control: both project offset/limit into the URL. Canonicalize to a

@@ -2,7 +2,7 @@ defmodule Tunez.UI.ArtistIndexPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -11,7 +11,7 @@ defmodule Tunez.UI.ArtistIndexPage do
 
   ash_blueprint do
     stylesheets([
-      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/theme/codicons.css",
       "priv/static/assets/app.css"
     ])
   end

@@ -2,7 +2,7 @@ defmodule Tunez.UI.AlbumFormPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -11,7 +11,7 @@ defmodule Tunez.UI.AlbumFormPage do
 
   ash_blueprint do
     stylesheets([
-      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/theme/codicons.css",
       "priv/static/assets/app.css"
     ])
   end
@@ -443,10 +443,8 @@ defmodule Tunez.UI.AlbumFormPage do
 
           case result do
             {:ok, album} ->
-              {:ok, _flash} =
-                Tunez.UI.put_flash(session_id, :info, "Album saved successfully", %{carry?: true},
-                  scope: context
-                )
+              {:ok, _toast} =
+                Tunez.UI.put_toast(session_id, :info, "Album saved successfully", scope: context)
 
               Ash.Changeset.force_change_attributes(changeset, %{
                 saved_artist_id: album.artist_id,

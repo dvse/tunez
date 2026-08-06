@@ -2,11 +2,6 @@ defmodule Tunez.UI do
   use Ash.Domain, otp_app: :tunez, extensions: [AshLua.Domain, AshAi]
 
   lua do
-    namespace "ui.page_life" do
-      action :read, Tunez.UI.PageLife, :read
-      action :begin, Tunez.UI.PageLife, :begin
-    end
-
     namespace "ui.app_shell" do
       action :for_session, Tunez.UI.AppShell, :for_session
       action :mount, Tunez.UI.AppShell, :mount
@@ -21,16 +16,17 @@ defmodule Tunez.UI do
       action :close_menu, Tunez.UI.PageHeader, :close_menu
     end
 
-    namespace "ui.flash" do
-      action :read, Tunez.UI.Flash, :read
-      action :put, Tunez.UI.Flash, :put
-      action :dismiss, Tunez.UI.Flash, :dismiss
+    namespace "ui.toast" do
+      action :read, Tunez.UI.Toast, :read
+      action :live, Tunez.UI.Toast, :live
+      action :put, Tunez.UI.Toast, :put
+      action :dismiss, Tunez.UI.Toast, :dismiss
     end
 
-    namespace "ui.flash_stack" do
-      action :for_session, Tunez.UI.FlashStack, :for_session
-      action :mount, Tunez.UI.FlashStack, :mount
-      action :dismiss, Tunez.UI.FlashStack, :dismiss
+    namespace "ui.toast_stack" do
+      action :for_session, Tunez.UI.ToastStack, :for_session
+      action :mount, Tunez.UI.ToastStack, :mount
+      action :dismiss, Tunez.UI.ToastStack, :dismiss
     end
 
     namespace "ui.artist_index_page" do
@@ -119,15 +115,12 @@ defmodule Tunez.UI do
     resource Tunez.UI.ArtistShowPage
     resource Tunez.UI.ConfirmPage
 
-    resource Tunez.UI.FlashStack
+    resource Tunez.UI.ToastStack
 
-    resource Tunez.UI.Flash do
-      define :put_flash, action: :put, args: [:session_id, :kind, :message]
-      define :dismiss_flash, action: :dismiss, get_by_identity: :session_kind
-    end
-
-    resource Tunez.UI.PageLife do
-      define :current_page_life, action: :read, get_by: :session_id
+    resource Tunez.UI.Toast do
+      define :put_toast, action: :put, args: [:session_id, :severity, :message]
+      define :live_toasts, action: :live, args: [:session_id]
+      define :dismiss_toast, action: :dismiss, get_by_identity: :session_severity
     end
 
     resource Tunez.UI.NotificationsPage

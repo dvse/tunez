@@ -2,7 +2,7 @@ defmodule Tunez.UI.AppShell do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -41,7 +41,7 @@ defmodule Tunez.UI.AppShell do
       public? true
     end
 
-    has_one :flash_stack, Tunez.UI.FlashStack do
+    has_one :toast_stack, Tunez.UI.ToastStack do
       source_attribute :session_id
       destination_attribute :session_id
       public? true
@@ -116,7 +116,7 @@ defmodule Tunez.UI.AppShell do
                     ])
                   ]),
                   box(:app_content, [], [
-                    render(Tunez.UI.FlashStack, %{}),
+                    render(Tunez.UI.ToastStack, %{}),
                     content
                   ])
                 ])

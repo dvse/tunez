@@ -32,17 +32,13 @@ defmodule TunezWeb.Endpoint do
   # build input verified at compile time AND the served href (DESIGN §9). The
   # declared entries name the built artifact under priv/static/, so serve the
   # project's priv/static directory at the same path the declarations use.
+  # Tunez owns its icon paint too: priv/static/theme/codicons.css declares only
+  # the glyphs this app renders and loads the vendored font from /fonts.
   plug Plug.Static,
     at: "/priv/static",
     from: :tunez,
     gzip: false,
-    only: ~w(assets)
-
-  plug Plug.Static,
-    at: "/app_domain_workbench/priv/theme",
-    from: Path.expand("../../../app_domain_workbench/priv/theme", __DIR__),
-    gzip: false,
-    only: ~w(styles fonts)
+    only: ~w(assets theme)
 
   plug AshBlueprint.Phoenix.Assets
 

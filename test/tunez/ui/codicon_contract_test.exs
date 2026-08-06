@@ -1,7 +1,7 @@
 defmodule Tunez.UI.CodiconContractTest do
   use TunezWeb.ConnCase, async: true
 
-  @shared_icons "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css"
+  @icons "priv/static/theme/codicons.css"
   @app_css "priv/static/assets/app.css"
 
   @routed_resources [
@@ -24,7 +24,7 @@ defmodule Tunez.UI.CodiconContractTest do
     Tunez.UI.ArtistShowPage,
     Tunez.UI.ConfirmPage,
     Tunez.UI.CoverImage,
-    Tunez.UI.FlashStack,
+    Tunez.UI.ToastStack,
     Tunez.UI.FormControl,
     Tunez.UI.MagicSignInPage,
     Tunez.UI.NotificationsPage,
@@ -35,9 +35,9 @@ defmodule Tunez.UI.CodiconContractTest do
     brand_icon: ["music"],
     empty_icon: ["circle-slash"],
     field_error_icon: List.duplicate("error", 5),
-    flash_close_icon: List.duplicate("close", 4),
-    flash_kind_icon: List.duplicate("error", 3),
-    flash_spinner: List.duplicate("loading", 2),
+    toast_close_icon: List.duplicate("close", 4),
+    toast_severity_icon: List.duplicate("error", 3),
+    toast_spinner: List.duplicate("loading", 2),
     follow_toggle_icon: ["star", "star-full"],
     followed_icon: ["star-full"],
     follower_count_icon: ["star"],
@@ -76,16 +76,16 @@ defmodule Tunez.UI.CodiconContractTest do
              "unexpected static data-icon values for #{inspect(part)}"
 
       case part do
-        :flash_kind_icon ->
+        :toast_severity_icon ->
           assert [
                    %AshBlueprint.Expr.Compiled{
                      source: source,
-                     deps: [item: [:flash, [:kind]]]
+                     deps: [item: [:toast, [:severity]]]
                    }
                  ] = dynamic
 
-          assert source =~ ~s({:_item, :flash, [:kind]} == :info ->\n    "pass-filled")
-          assert source =~ ~s({:_item, :flash, [:kind]} == :error ->\n    "error")
+          assert source =~ ~s({:_item, :toast, [:severity]} == :info ->\n    "pass-filled")
+          assert source =~ ~s({:_item, :toast, [:severity]} == :error ->\n    "error")
           assert source =~ ~s(true ->\n    "warning")
 
         _part ->
@@ -94,38 +94,29 @@ defmodule Tunez.UI.CodiconContractTest do
     end)
   end
 
-  test "every routed resource loads the shared icon sheet before app paint" do
+  test "every routed resource loads the app's own icon sheet before app paint" do
     Enum.each(@routed_resources, fn resource ->
-      assert AshBlueprint.Info.declared_stylesheets(resource) == [@shared_icons, @app_css]
-      assert AshBlueprint.Info.stylesheets(resource) == [@shared_icons, @app_css]
+      assert AshBlueprint.Info.declared_stylesheets(resource) == [@icons, @app_css]
+      assert AshBlueprint.Info.stylesheets(resource) == [@icons, @app_css]
     end)
   end
 
-  test "the endpoint serves only the shared theme style and font trees", %{conn: conn} do
-    conn =
-      get(
-        conn,
-        "/app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css"
-      )
+  test "the endpoint serves the app's own icon sheet and font", %{conn: conn} do
+    sheet = conn |> get("/priv/static/theme/codicons.css") |> response(200)
 
-    sheet = response(conn, 200)
     assert sheet =~ "font-family: 'codicon'"
+    assert sheet =~ "url('/fonts/codicon.ttf')"
 
     Enum.each(@codicons, fn icon ->
       assert sheet =~ ~s([part][data-icon="#{icon}"]::before)
     end)
 
-    conn =
-      build_conn()
-      |> get("/app_domain_workbench/priv/theme/fonts/codicon.ttf")
+    # the sheet carries this app's glyphs and nothing else
+    assert length(Regex.scan(~r/\[part\]\[data-icon="[^"]+"\]::before/, sheet)) ==
+             length(@codicons)
 
-    assert byte_size(response(conn, 200)) > 1_000
-
-    conn =
-      build_conn()
-      |> get("/app_domain_workbench/priv/theme/codicons.json")
-
-    assert response(conn, 404)
+    font = build_conn() |> get("/fonts/codicon.ttf") |> response(200)
+    assert byte_size(font) > 1_000
   end
 
   test "owned source and compiled paint contain no Heroicon or mask remnants" do

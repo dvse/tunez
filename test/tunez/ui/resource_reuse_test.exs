@@ -41,7 +41,7 @@ defmodule Tunez.UI.ResourceReuseTest do
 
     assert Map.fetch!(parents_by_child, Tunez.UI.AppShell) == MapSet.new(@pages)
 
-    assert Map.fetch!(parents_by_child, Tunez.UI.FlashStack) ==
+    assert Map.fetch!(parents_by_child, Tunez.UI.ToastStack) ==
              MapSet.new([Tunez.UI.AppShell])
 
     assert Map.fetch!(parents_by_child, Tunez.UI.FormControl) ==

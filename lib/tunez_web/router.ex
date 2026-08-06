@@ -100,8 +100,8 @@ defmodule TunezWeb.Router do
   scope "/", TunezWeb do
     pipe_through :browser
 
-    auth_routes AuthController, Tunez.Accounts.User, path: "/auth"
-    sign_out_route AuthController
+    auth_routes Auth, Tunez.Accounts.User, path: "/auth"
+    sign_out_route Auth
   end
 
   # Other scopes may use custom stacks.

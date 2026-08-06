@@ -2,7 +2,7 @@ defmodule Tunez.UI.ArtistShowPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do
@@ -11,7 +11,7 @@ defmodule Tunez.UI.ArtistShowPage do
 
   ash_blueprint do
     stylesheets([
-      "../app_domain_workbench/priv/theme/styles/vscode/10-vscode-icons.css",
+      "priv/static/theme/codicons.css",
       "priv/static/assets/app.css"
     ])
   end
@@ -374,8 +374,8 @@ defmodule Tunez.UI.ArtistShowPage do
 
           case Tunez.Music.destroy_album(album, scope: context) do
             :ok ->
-              {:ok, _flash} =
-                Tunez.UI.put_flash(
+              {:ok, _toast} =
+                Tunez.UI.put_toast(
                   changeset.data.session_id,
                   :info,
                   "Album deleted successfully",
@@ -401,12 +401,11 @@ defmodule Tunez.UI.ArtistShowPage do
         Ash.Changeset.before_action(changeset, fn changeset ->
           case Tunez.Music.destroy_artist(changeset.data.artist, scope: context) do
             :ok ->
-              {:ok, _flash} =
-                Tunez.UI.put_flash(
+              {:ok, _toast} =
+                Tunez.UI.put_toast(
                   changeset.data.session_id,
                   :info,
                   "Artist deleted successfully",
-                  %{carry?: true},
                   scope: context
                 )
 

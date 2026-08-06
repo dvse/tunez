@@ -19,7 +19,7 @@ defmodule TunezWeb.AuthenticationTest do
     |> fill_in("Password Confirmation", with: "password")
     |> click_button("Register")
     |> assert_path(~p"/")
-    |> assert_has(flash(:info), text: "You are now signed in")
+    |> assert_has(toast(:info), text: "You are now signed in")
     |> assert_has("strong", text: email)
 
     assert {:ok, user} = Tunez.Accounts.get_user_by_email(email, authorize?: false)
@@ -45,11 +45,11 @@ defmodule TunezWeb.AuthenticationTest do
       |> click_button("Sign in")
     end)
     |> assert_path(~p"/")
-    |> assert_has(flash(:info), text: "You are now signed in")
+    |> assert_has(toast(:info), text: "You are now signed in")
     |> assert_has("strong", text: "other@sevenseacat.net")
   end
 
-  test "wrong password returns to the Blueprint sign-in page with an error flash", %{conn: conn} do
+  test "wrong password returns to the Blueprint sign-in page with an error notice", %{conn: conn} do
     generate(user(email: "wrong-password@sevenseacat.net", password: "password"))
 
     conn
@@ -61,7 +61,7 @@ defmodule TunezWeb.AuthenticationTest do
       |> click_button("Sign in")
     end)
     |> assert_path(~p"/sign-in")
-    |> assert_has(flash(:error), text: "Incorrect email or password")
+    |> assert_has(toast(:error), text: "Incorrect email or password")
   end
 
   test "auth pages mount through the Datastar bridge", %{conn: conn} do

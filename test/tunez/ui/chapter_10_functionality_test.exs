@@ -108,7 +108,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
 
       session
       |> click_selector("[part=follow_toggle]")
-      |> assert_has(~s([part="flash_message"][data-kind="error"]))
+      |> assert_has(~s([part="toast_message"][data-severity="error"]))
     end
 
     test "admin can delete an album and artist", %{conn: conn} do
@@ -126,7 +126,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       session =
         session
         |> click_link("#album-#{album.id} a", "Delete")
-        |> assert_has(~s([part="flash_message"][data-kind="info"]),
+        |> assert_has(~s([part="toast_message"][data-severity="info"]),
           text: "Album deleted successfully"
         )
 
@@ -139,7 +139,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/artists/#{album.artist_id}")
       |> click_link("Delete Artist")
-      |> assert_has(~s([part="flash_message"][data-kind="info"]),
+      |> assert_has(~s([part="toast_message"][data-severity="info"]),
         text: "Artist deleted successfully"
       )
 
@@ -179,7 +179,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
         |> assert_field_value("#artist_form_name", "Temperance")
         |> assert_field_value("#artist_form_biography", "Electronic music")
         |> click_button("Save")
-        |> assert_has(~s([part="flash_message"][data-kind="info"]),
+        |> assert_has(~s([part="toast_message"][data-severity="info"]),
           text: "Artist saved successfully"
         )
         |> assert_has("h1", text: "Temperance")
@@ -188,8 +188,8 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
 
       dismissed_session =
         session
-        |> click_selector("#flash-info")
-        |> refute_has(~s([part="flash_message"][data-kind="info"]))
+        |> click_selector("#toast-info")
+        |> refute_has(~s([part="toast_message"][data-severity="info"]))
         |> assert_has("h1", text: "Temperance")
 
       assert fragment_html(dismissed_session, "h1") == heading_html
@@ -205,7 +205,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       |> assert_field_value("#artist_form_name", "New Temperance")
       |> assert_field_value("#artist_form_biography", "New electronic music")
       |> click_button("Save")
-      |> assert_has(~s([part="flash_message"][data-kind="info"]),
+      |> assert_has(~s([part="toast_message"][data-severity="info"]),
         text: "Artist saved successfully"
       )
       |> assert_has("h1", text: "New Temperance")
@@ -219,7 +219,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       artist = generate(artist(name: "Old Name"))
 
       # The original Ash error is projected onto the bound control; the domain
-      # and the location stay put without adding a second generic flash error.
+      # and the location stay put without adding a second generic error notice.
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/artists/#{artist.id}/edit")
@@ -344,7 +344,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       session
       |> assert_has("tr[data-id]", count: 2)
       |> click_button("Save")
-      |> assert_has(~s([part="flash_message"][data-kind="info"]),
+      |> assert_has(~s([part="toast_message"][data-severity="info"]),
         text: "Album saved successfully"
       )
       |> assert_has("h2", text: "Sample With Tracks")
@@ -440,7 +440,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       session
       |> assert_has("tr[data-id]", count: 2)
       |> click_button("Save")
-      |> assert_has(~s([part="flash_message"][data-kind="info"]),
+      |> assert_has(~s([part="toast_message"][data-severity="info"]),
         text: "Album saved successfully"
       )
       |> assert_has("h2", text: "New Name")
@@ -460,7 +460,7 @@ defmodule Tunez.UI.Chapter10FunctionalityTest do
       refute Enum.any?(updated_album.tracks, &(&1.id == removed_track.id))
 
       # The original Ash error is projected onto the bound control; the domain
-      # and the location stay put without adding a second generic flash error.
+      # and the location stay put without adding a second generic error notice.
       conn
       |> insert_and_authenticate_user(:admin)
       |> visit(~p"/albums/#{album.id}/edit")

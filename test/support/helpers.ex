@@ -46,8 +46,8 @@ defmodule Tunez.Support.Helpers do
 
   # ------ Selectors --------------------------------------------------------
 
-  @doc "HTML selector for flash messages."
-  def flash(type), do: "[part='flash_message'][data-kind='#{type}']"
+  @doc "HTML selector for toast notices."
+  def toast(severity), do: "[part='toast_message'][data-severity='#{severity}']"
 
   def link(href), do: "a[href='#{href}']"
 

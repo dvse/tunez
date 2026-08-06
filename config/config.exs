@@ -99,7 +99,7 @@ config :tunez, TunezWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: TunezWeb.ErrorHTML, json: TunezWeb.ErrorJSON],
+    formats: [html: AshBlueprint.Phoenix.Errors, json: AshBlueprint.Phoenix.Errors],
     layout: false
   ],
   pubsub_server: Tunez.PubSub,

@@ -2,7 +2,7 @@ defmodule Tunez.UI.NotificationsPage do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   ets do

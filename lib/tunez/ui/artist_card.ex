@@ -2,7 +2,7 @@ defmodule Tunez.UI.ArtistCard do
   use Ash.Resource,
     domain: Tunez.UI,
     data_layer: :embedded,
-    extensions: [AshBlueprint, Tunez.UI.Blueprint, AshLua.Resource],
+    extensions: [AshBlueprint, AshLua.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   policies do

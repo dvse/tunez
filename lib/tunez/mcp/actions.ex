@@ -12,11 +12,10 @@ defmodule Tunez.MCP.Actions do
     resource Tunez.Music.Album
     resource Tunez.Music.Track
     resource Tunez.Music.ArtistFollower
-    resource Tunez.UI.PageLife
     resource Tunez.UI.AppShell
     resource Tunez.UI.PageHeader
-    resource Tunez.UI.Flash
-    resource Tunez.UI.FlashStack
+    resource Tunez.UI.Toast
+    resource Tunez.UI.ToastStack
     resource Tunez.UI.ArtistIndexPage
     resource Tunez.UI.ArtistShowPage
     resource Tunez.UI.ArtistFormPage

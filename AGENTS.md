@@ -93,18 +93,29 @@ semantics. Re-audit before adding another confirmation monitor field or an
 OAuth/OIDC strategy.
 
 
-## Page-life clock
+## Toast expiry
 
-`Tunez.UI.PageLife` is the session's navigation clock. `Tunez.UI.Blueprint`
-declares the compile-verified
-`{Tunez.UI.PageLifeDomain, :begin_page_life}` contract once and AshBlueprint
-supplies it only to routed mounts. The small domain owns only that interface so
-the substrate can compile before the routed resources that `Tunez.UI` itself
-registers. Flash rows are stamped with the life they were put in; visibility is
-the pure comparison in `Tunez.UI.Flash.visible?`. Failure flashes are NOT rows:
+`Tunez.UI.Toast` is a transient notice: one row per (session, severity)
+carrying its message and the instant it stops being shown. `put` takes a typed
+`:ttl_seconds` argument and writes `expires_at`; the `Tunez.UI.ToastStack`
+relationship and the `:live` read both filter `expires_at > now()`, so the
+filter IS the expiry. Dismissal deletes the row. Failure notices are NOT rows:
 they are projections of the dispatch's fieldless errors (`errors()` in
-`Tunez.UI.FlashStack`), which gives them per-dispatch transience with zero
+`Tunez.UI.ToastStack`), which gives them per-dispatch transience with zero
 lifecycle state.
+
+One action-local `change fn` in `Toast.put` derives `expires_at` from
+`:ttl_seconds`. Proof: `set_attribute` accepts a literal, an argument template,
+or a zero-arity function and does not evaluate an Ash expression, and a create
+`atomic_update` applies only on an upsert's conflict branch, which would leave
+a fresh insert without the required attribute. The callback is the smallest
+exception: it is inline in the owning action, reads one typed argument, and
+writes one modeled attribute. Cleanup condition: replace it when
+`set_attribute` accepts an expression.
+
+Page-life counters are a deleted concept. Nothing in this app ticks a
+navigation clock, and no mount installs a lifecycle change beyond the
+framework's own session provisioning.
 
 ## Album track materialization
 

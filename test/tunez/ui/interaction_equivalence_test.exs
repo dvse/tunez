@@ -327,7 +327,7 @@ for backend <- [:phoenix, :datastar] do
       |> refute_attribute("#album_form_name", "aria-invalid", "true")
     end
 
-    test "#{backend}: successful edits persist, navigate, and match upstream flash states", %{
+    test "#{backend}: successful edits persist, navigate, and match upstream notice states", %{
       conn: conn,
       upstream: upstream
     } do

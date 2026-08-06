@@ -46,11 +46,10 @@ defmodule TunezWeb.MCPTest do
            |> Enum.map(& &1.name)
            |> MapSet.new() ==
              MapSet.new([
-               "ui.page_life",
                "ui.app_shell",
                "ui.page_header",
-               "ui.flash",
-               "ui.flash_stack",
+               "ui.toast",
+               "ui.toast_stack",
                "ui.artist_index_page",
                "ui.artist_show_page",
                "ui.artist_form_page",
